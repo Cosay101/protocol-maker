@@ -1,0 +1,21 @@
+{
+  "format": "ptcl",
+  "schemaVersion": "1.0",
+  "id": "p_sample_minimal_001",
+  "meta": {
+    "title": "最小サンプル",
+    "author": "山田 太郎",
+    "createdAt": "2026-04-16T09:00:00+09:00",
+    "updatedAt": "2026-04-16T09:00:00+09:00"
+  },
+  "page": { "size": "A4", "orientation": "portrait" },
+  "mainFlow": {
+    "blocks": [
+      { "id": "b_01", "type": "operation", "text": "サンプルをチューブに分注" },
+      { "id": "b_02", "type": "arrow" },
+      { "id": "b_03", "type": "operation", "text": "氷上静置, 5min, 4℃" }
+    ],
+    "attachments": []
+  },
+  "freeElements": []
+}

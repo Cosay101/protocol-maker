@@ -1,0 +1,58 @@
+{
+  "format": "ptcl",
+  "schemaVersion": "1.0",
+  "id": "p_sample_cell_fixation_001",
+  "meta": {
+    "title": "HeLa 細胞 固定プロトコル (サンプル)",
+    "author": "研究室メンバー",
+    "createdAt": "2026-04-10T10:00:00+09:00",
+    "updatedAt": "2026-04-15T14:30:00+09:00"
+  },
+  "page": { "size": "A4", "orientation": "portrait" },
+  "mainFlow": {
+    "blocks": [
+      { "id": "b_01", "type": "operation", "text": "培地を吸引" },
+      { "id": "b_02", "type": "arrow" },
+      { "id": "b_03", "type": "operation", "text": "PBSで1回洗浄" },
+      { "id": "b_04", "type": "arrow" },
+      { "id": "b_05", "type": "operation", "text": "室温静置, 15min" },
+      { "id": "b_06", "type": "arrow" },
+      { "id": "b_07", "type": "operation", "text": "PBSで3回洗浄" }
+    ],
+    "attachments": [
+      {
+        "id": "att_01",
+        "kind": "side-in",
+        "anchorId": "b_02",
+        "text": "PBS, 1mL",
+        "order": 0
+      },
+      {
+        "id": "att_02",
+        "kind": "side-out",
+        "anchorId": "b_04",
+        "text": "上清除去",
+        "order": 0
+      },
+      {
+        "id": "att_03",
+        "kind": "side-in",
+        "anchorId": "b_04",
+        "text": "4% PFA, 500μL",
+        "order": 1
+      }
+    ]
+  },
+  "freeElements": [
+    {
+      "id": "f_01",
+      "type": "text",
+      "x": 440,
+      "y": 120,
+      "w": 180,
+      "h": 80,
+      "text": "備考: PFAはドラフト内で扱う",
+      "frame": false
+    }
+  ]
+}

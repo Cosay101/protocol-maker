@@ -1,0 +1,7 @@
+# テキストファイルは LF で統一（Windows の CRLF 自動変換を抑制）
+* text=auto eol=lf
+
+# バイナリファイル
+*.png binary
+*.ico binary
+*.icns binary
