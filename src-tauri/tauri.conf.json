@@ -26,6 +26,12 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
@@ -38,6 +44,25 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["ptcl"],
+        "name": "Protocol Maker Document",
+        "description": "Protocol Maker のプロトコルファイル",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Japanese"],
+        "displayLanguageSelector": false
+      },
+      "signCommand": "signtool sign /fd SHA256 /f \"%CODESIGN_PFX%\" /p \"%CODESIGN_PASSWORD%\" /tr http://timestamp.sectigo.com /td SHA256 %1"
+    }
   }
 }

@@ -1,5 +1,53 @@
 @import "tailwindcss";
 
+/* ================================================================
+   カスタムフォント定義
+   フォントファイルは public/fonts/ 以下に配置してください。
+   - ゴシック: public/fonts/gothic/regular.woff2 (or .ttf / .otf)
+               public/fonts/gothic/bold.woff2
+   - 明朝:     public/fonts/mincho/regular.woff2 (or .ttf / .otf)
+               public/fonts/mincho/bold.woff2
+   ファイルが存在しない間はシステムフォントのフォールバックが使われます。
+   ================================================================ */
+
+@font-face {
+  font-family: 'PtclGothic';
+  src: url('/fonts/gothic/regular.woff2') format('woff2'),
+       url('/fonts/gothic/regular.ttf')   format('truetype'),
+       url('/fonts/gothic/regular.otf')   format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'PtclGothic';
+  src: url('/fonts/gothic/bold.woff2') format('woff2'),
+       url('/fonts/gothic/bold.ttf')   format('truetype'),
+       url('/fonts/gothic/bold.otf')   format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PtclMincho';
+  src: url('/fonts/mincho/regular.woff2') format('woff2'),
+       url('/fonts/mincho/regular.ttf')   format('truetype'),
+       url('/fonts/mincho/regular.otf')   format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'PtclMincho';
+  src: url('/fonts/mincho/bold.woff2') format('woff2'),
+       url('/fonts/mincho/bold.ttf')   format('truetype'),
+       url('/fonts/mincho/bold.otf')   format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -23,4 +71,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 検索ハイライト */
+mark.ptcl-hl {
+  background: #fef08a; /* yellow-200 */
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }

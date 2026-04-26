@@ -3,14 +3,25 @@ import type { z } from "zod";
 import type {
   MetaSchema,
   PageSchema,
+  BlockStyleSchema,
   OperationBlockSchema,
   ArrowBlockSchema,
+  SpacerBlockSchema,
+  BranchBlockSchema,
+  ColumnBreakBlockSchema,
   MainFlowBlockSchema,
   SideInAttachmentSchema,
   SideOutAttachmentSchema,
+  LoopAttachmentSchema,
   AttachmentSchema,
+  BranchFlowBlockSchema,
+  BranchFlowSchema,
   MainFlowSchema,
   TextFreeElementSchema,
+  ImageFreeElementSchema,
+  TableFreeElementSchema,
+  TableCellSchema,
+  ArrowFreeElementSchema,
   FreeElementSchema,
   PtclDocumentSchema,
   MainFlowFragmentSchema,
@@ -28,17 +39,28 @@ import type {
 export type Meta = z.infer<typeof MetaSchema>;
 export type Page = z.infer<typeof PageSchema>;
 
+export type BlockStyle = z.infer<typeof BlockStyleSchema>;
 export type OperationBlock = z.infer<typeof OperationBlockSchema>;
 export type ArrowBlock = z.infer<typeof ArrowBlockSchema>;
+export type SpacerBlock = z.infer<typeof SpacerBlockSchema>;
+export type BranchBlock = z.infer<typeof BranchBlockSchema>;
+export type ColumnBreakBlock = z.infer<typeof ColumnBreakBlockSchema>;
 export type MainFlowBlock = z.infer<typeof MainFlowBlockSchema>;
+export type BranchFlowBlock = z.infer<typeof BranchFlowBlockSchema>;
+export type BranchFlow = z.infer<typeof BranchFlowSchema>;
 
 export type SideInAttachment = z.infer<typeof SideInAttachmentSchema>;
 export type SideOutAttachment = z.infer<typeof SideOutAttachmentSchema>;
+export type LoopAttachment = z.infer<typeof LoopAttachmentSchema>;
 export type Attachment = z.infer<typeof AttachmentSchema>;
 
 export type MainFlow = z.infer<typeof MainFlowSchema>;
 
 export type TextFreeElement = z.infer<typeof TextFreeElementSchema>;
+export type ImageFreeElement = z.infer<typeof ImageFreeElementSchema>;
+export type TableFreeElement = z.infer<typeof TableFreeElementSchema>;
+export type TableCell = z.infer<typeof TableCellSchema>;
+export type ArrowFreeElement = z.infer<typeof ArrowFreeElementSchema>;
 export type FreeElement = z.infer<typeof FreeElementSchema>;
 
 export type PtclDocument = z.infer<typeof PtclDocumentSchema>;

@@ -26,7 +26,7 @@ export function createEmptyDocument(params?: {
       updatedAt: now,
     },
     page: { size: "A4", orientation: "portrait" },
-    mainFlow: { blocks: [], attachments: [] },
+    mainFlow: { blocks: [], attachments: [], branchFlows: [] },
     freeElements: [],
   };
 }

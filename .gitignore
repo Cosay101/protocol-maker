@@ -53,3 +53,10 @@ Thumbs.db
 
 # テスト用一時ファイル（誤コミット防止）
 *.local.ptcl
+
+# 署名キー（絶対にコミットしない）
+.tauri-signing-key
+.tauri-signing-key.pub
+
+# dist（ビルド成果物）
+/dist/

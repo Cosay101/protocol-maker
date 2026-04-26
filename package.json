@@ -10,12 +10,17 @@
     "format": "prettier --write .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build && node scripts/copy-installer.mjs",
+    "tauri:beta": "tauri build --debug && node scripts/copy-installer.mjs",
+    "dist:open": "explorer dist",
+    "release:setup": "tauri signer generate -w .tauri-signing-key && echo 公開鍵を tauri.conf.json の plugins.updater.pubkey に貼り付けてください"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "nanoid": "^5",
     "next": "16.2.4",
     "react": "19.2.4",

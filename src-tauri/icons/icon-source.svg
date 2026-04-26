@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#5b7ee0"/>
+      <stop offset="100%" stop-color="#2d4db5"/>
+    </linearGradient>
+    <!-- P の影（少し下にずらした暗い複製） -->
+    <filter id="pshadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="10" dy="16" stdDeviation="18" flood-color="rgba(0,0,40,0.35)"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1024" height="1024" rx="195" fill="url(#bg)"/>
+
+  <!-- P 文字（白・複合パス：外形 - ボウル内側 = 文字の厚み） -->
+  <path
+    fill-rule="evenodd"
+    fill="white"
+    filter="url(#pshadow)"
+    d="
+      M 128,92
+      L 128,932
+      L 288,932
+      L 288,538
+      Q 520,542 650,460
+      Q 748,393 748,310
+      Q 748,183 628,138
+      Q 548,108 400,104
+      Z
+
+      M 288,202
+      Q 490,202 575,255
+      Q 628,287 628,332
+      Q 628,398 555,428
+      Q 476,458 288,456
+      Z
+    "
+  />
+
+  <!-- ボウル内のフローチャート（青背景に白い箱＋矢印） -->
+  <!-- 上のボックス -->
+  <rect x="318" y="218" width="190" height="72" rx="14" fill="#3a5ec4"/>
+  <rect x="330" y="228" width="166" height="52" rx="10" fill="none" stroke="white" stroke-width="5" stroke-opacity="0.9"/>
+
+  <!-- 矢印1：縦線 -->
+  <line x1="413" y1="290" x2="413" y2="325" stroke="white" stroke-width="7" stroke-linecap="round"/>
+  <!-- 矢印1：矢じり -->
+  <polygon points="396,316 413,336 430,316" fill="white"/>
+
+  <!-- 下のボックス -->
+  <rect x="318" y="338" width="190" height="72" rx="14" fill="#3a5ec4"/>
+  <rect x="330" y="348" width="166" height="52" rx="10" fill="none" stroke="white" stroke-width="5" stroke-opacity="0.9"/>
+
+  <!-- 矢印2：縦線 -->
+  <line x1="413" y1="410" x2="413" y2="442" stroke="white" stroke-width="7" stroke-linecap="round"/>
+  <!-- 矢印2：矢じり -->
+  <polygon points="396,433 413,453 430,433" fill="white"/>
+</svg>

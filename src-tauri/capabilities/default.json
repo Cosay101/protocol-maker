@@ -6,6 +6,17 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:scope-home-recursive",
+    "fs:scope-downloads-recursive",
+    "fs:scope-documents-recursive",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:allow-relaunch"
   ]
 }
