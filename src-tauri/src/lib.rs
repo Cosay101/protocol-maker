@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use tauri::Manager;
 
 /// ダブルクリック起動時に OS から渡された .ptcl パスを保持する
 struct StartupFile(Mutex<Option<String>>);
@@ -16,9 +17,10 @@ fn read_startup_ptcl(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
-/// DevTools のトグル（デバッグビルドのみ有効）
+/// DevTools のトグル（デバッグビルドのみ動作、リリースビルドでは何もしない）
 #[tauri::command]
-fn toggle_devtools(window: tauri::WebviewWindow) {
+fn toggle_devtools(#[allow(unused_variables)] window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
     if window.is_devtools_open() {
         window.close_devtools();
     } else {
@@ -48,7 +50,8 @@ pub fn run() {
             toggle_devtools
         ])
         .setup(|app| {
-            if cfg!(debug_assertions) {
+            #[cfg(debug_assertions)]
+            {
                 // デバッグビルドのみ: ログプラグインを有効化
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
