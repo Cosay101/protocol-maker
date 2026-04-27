@@ -54,6 +54,9 @@ Thumbs.db
 # テスト用一時ファイル（誤コミット防止）
 *.local.ptcl
 
+# 配布用（インストーラー含むため除外）
+/配布用/*.exe
+
 # 署名キー（絶対にコミットしない）
 .tauri-signing-key
 .tauri-signing-key.pub
