@@ -61,8 +61,7 @@
         "installMode": "currentUser",
         "languages": ["Japanese"],
         "displayLanguageSelector": false
-      },
-      "signCommand": "signtool sign /fd SHA256 /f \"%CODESIGN_PFX%\" /p \"%CODESIGN_PASSWORD%\" /tr http://timestamp.sectigo.com /td SHA256 %1"
+      }
     }
   }
 }
