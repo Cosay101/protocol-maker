@@ -66,7 +66,17 @@ function EditPageInner() {
   // ?print=1 → ドキュメント読み込み後に印刷ダイアログを自動起動
   useEffect(() => {
     if (!shouldPrint || !doc) return;
-    const timer = setTimeout(() => window.print(), 400);
+    const timer = setTimeout(() => {
+      // @page サイズをドキュメントの用紙設定に合わせて動的注入
+      const prev = document.getElementById("__ptcl_page_size__");
+      if (prev) prev.remove();
+      const style = document.createElement("style");
+      style.id = "__ptcl_page_size__";
+      style.textContent = `@page { size: ${doc.page.size} ${doc.page.orientation}; margin: 0; }`;
+      document.head.appendChild(style);
+      window.print();
+      window.addEventListener("afterprint", () => style.remove(), { once: true });
+    }, 400);
     return () => clearTimeout(timer);
   }, [shouldPrint, doc]);
 
@@ -86,8 +96,8 @@ function EditPageInner() {
       <TabBar isDirty={isDirty} />
       <Ribbon />
       {/* ---- スクロール可能な紙面エリア ---- */}
-      <div className="flex min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto my-8 flex flex-col gap-6" style={{ width: paperW }}>
+      <div data-print-scroll className="flex min-h-0 flex-1 overflow-auto">
+        <div data-print-canvas className="mx-auto my-8 flex flex-col gap-6" style={{ width: paperW }}>
           <PageCanvas />
         </div>
       </div>
@@ -100,7 +110,7 @@ function EditPageInner() {
 // ============================================================
 function TabBar({ isDirty }: { isDirty: boolean }) {
   return (
-    <header className="flex h-9 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-3">
+    <header data-no-print className="flex h-9 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-3">
       <div className="flex items-center">
         <Link
           href="/?tab=file"
@@ -1507,6 +1517,7 @@ function PageCanvas() {
             if (el) pageEls.current.set(pageIdx, el);
             else pageEls.current.delete(pageIdx);
           }}
+          data-page-sheet
           className="relative bg-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
           style={{
             width: paperW,

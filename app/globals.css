@@ -73,6 +73,54 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* ================================================================
+   印刷 / PDF 出力用スタイル
+   ================================================================ */
+@media print {
+  /* ツールバー・タブバーを非表示 */
+  [data-no-print],
+  [data-ribbon] {
+    display: none !important;
+  }
+
+  /* body のマージンをリセット */
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* スクロールコンテナの制約を解除 */
+  [data-print-scroll] {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+    display: block !important;
+  }
+
+  /* キャンバスラッパーのマージン・センタリングを除去 */
+  [data-print-canvas] {
+    margin: 0 !important;
+    width: 100% !important;
+    gap: 0 !important;
+  }
+
+  /* 各ページシート：影を除去、ページ区切りを設定 */
+  [data-page-sheet] {
+    box-shadow: none !important;
+    break-after: page;
+    page-break-after: always;
+    width: 100% !important;
+  }
+
+  /* 最後のページはページ区切り不要 */
+  [data-page-sheet]:last-child {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
+
 /* 検索ハイライト */
 mark.ptcl-hl {
   background: #fef08a; /* yellow-200 */
