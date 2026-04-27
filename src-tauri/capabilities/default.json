@@ -13,8 +13,8 @@
     "fs:allow-write-text-file",
     "fs:allow-exists",
     "fs:scope-home-recursive",
-    "fs:scope-downloads-recursive",
-    "fs:scope-documents-recursive",
+    "fs:scope-download-recursive",
+    "fs:scope-document-recursive",
     "updater:allow-check",
     "updater:allow-download-and-install",
     "process:allow-relaunch"
