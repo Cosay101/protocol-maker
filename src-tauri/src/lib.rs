@@ -1,5 +1,4 @@
 use std::sync::Mutex;
-use tauri::Manager;
 
 /// ダブルクリック起動時に OS から渡された .ptcl パスを保持する
 struct StartupFile(Mutex<Option<String>>);
@@ -17,14 +16,18 @@ fn read_startup_ptcl(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
-/// DevTools のトグル（デバッグビルドのみ動作、リリースビルドでは何もしない）
+/// DevTools のトグル（デバッグビルドのみ動作）
 #[tauri::command]
 fn toggle_devtools(#[allow(unused_variables)] window: tauri::WebviewWindow) {
     #[cfg(debug_assertions)]
-    if window.is_devtools_open() {
-        window.close_devtools();
-    } else {
-        window.open_devtools();
+    {
+        use tauri::Manager as _;
+        let _ = &window; // suppress unused warning
+        if window.is_devtools_open() {
+            window.close_devtools();
+        } else {
+            window.open_devtools();
+        }
     }
 }
 
@@ -49,17 +52,18 @@ pub fn run() {
             read_startup_ptcl,
             toggle_devtools
         ])
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(debug_assertions)]
             {
+                use tauri::Manager;
                 // デバッグビルドのみ: ログプラグインを有効化
-                app.handle().plugin(
+                _app.handle().plugin(
                     tauri_plugin_log::Builder::default()
                         .level(log::LevelFilter::Info)
                         .build(),
                 )?;
                 // デバッグビルドのみ: DevTools を起動時に自動で開く
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = _app.get_webview_window("main") {
                     window.open_devtools();
                 }
             }

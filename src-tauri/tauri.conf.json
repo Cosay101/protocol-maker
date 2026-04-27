@@ -34,7 +34,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "shortDescription": "研究室向け 実験プロトコル フローチャート エディタ (beta)",
     "longDescription": "Protocol Maker は、研究室内配布を前提とした、実験プロトコルのフローチャートを素早く作れる軽量なデスクトップアプリです。",
     "category": "Productivity",
