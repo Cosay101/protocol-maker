@@ -56,17 +56,16 @@ export function normalizeMainFlow(mainFlow: MainFlow): MainFlow {
   }
 
   // Step 4: 連続 operation / branch の間に arrow を自動挿入
-  // （operation と branch はどちらも「コンテンツブロック」扱い）
+  // また spacer の直後に来る operation / branch の前にも arrow を挿入
   const isContentBlock = (b: MainFlowBlock) =>
     b.type === "operation" || b.type === "branch";
+  const needsArrow = (a: MainFlowBlock, b: MainFlowBlock) =>
+    (isContentBlock(a) && isContentBlock(b)) ||
+    (a.type === "spacer" && isContentBlock(b));
   const final: MainFlowBlock[] = [];
   for (let i = 0; i < merged.length; i++) {
     final.push(merged[i]);
-    if (
-      i < merged.length - 1 &&
-      isContentBlock(merged[i]) &&
-      isContentBlock(merged[i + 1])
-    ) {
+    if (i < merged.length - 1 && needsArrow(merged[i], merged[i + 1])) {
       final.push({ id: newBlockId(), type: "arrow" });
     }
   }

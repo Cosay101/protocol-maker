@@ -162,6 +162,19 @@ export function MainFlow({
           onDelete={() => onDeleteSpacer(block.id)}
         />,
       );
+      // スペーサーの後にも InsertGap を表示（ドラッグ中は非表示）
+      if (!dragId) {
+        elements.push(
+          <InsertGap
+            key={`gap-spacer-${block.id}`}
+            index={globalI + 1}
+            onDirectInsert={() => onDirectInsert(globalI + 1)}
+            onInsertSpacer={() => onInsertSpacer(globalI + 1)}
+            onInsertColumnBreak={onInsertColumnBreak ? () => onInsertColumnBreak(globalI + 1) : undefined}
+            extraH={blockGap}
+          />,
+        );
+      }
     } else if (block.type === "arrow") {
       const arrowAttachments = attachments.filter((a) => a.anchorId === block.id);
       const gapLocalIndex = i + 1;
