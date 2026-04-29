@@ -324,6 +324,7 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
             onBlur={handleEditBlur}
             onKeyDown={(e) => {
               e.stopPropagation();
+              if (e.nativeEvent.isComposing) return;
               if (e.key === "Escape") { setEditing(false); }
               // Shift+Enter → 改行、Enter のみ → 編集終了
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commitEdit(); }

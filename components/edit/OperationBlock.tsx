@@ -238,6 +238,10 @@ export function OperationBlock({
   function handleEditKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     e.stopPropagation();
 
+    // IME 変換中は Escape / Enter / Del を通常の編集操作として扱う
+    // (isComposing=true のとき: Escape=変換キャンセル, Enter=変換確定)
+    if (e.nativeEvent.isComposing) return;
+
     if (e.key === "Escape") {
       // 変更を破棄
       if (editRef.current) {

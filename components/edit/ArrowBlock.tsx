@@ -265,6 +265,7 @@ function SideRow({ att, selected, stemW, globalFont, onUpdate, onRemove, onNext 
       onBlur={commitEdit}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
         if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey)) {
           e.preventDefault();
           commitEdit();
@@ -378,6 +379,7 @@ function LoopRow({ att, selected, onUpdate, onRemove, onNext, globalFont }: {
             onBlur={commitEdit}
             onKeyDown={(e) => {
               e.stopPropagation();
+              if (e.nativeEvent.isComposing) return;
               if (e.key === "Enter") { e.preventDefault(); commitEdit(); onNext(); }
               if (e.key === "Escape") { e.preventDefault(); onNext(); }
             }}
