@@ -11,7 +11,7 @@
 //   - フォーカス時: リボンのフォント/サイズ/B/I/U がブロックレベルで適用される
 //   - テキスト選択時: リボンがインラインスタイルを適用する
 //   - グローバル未選択時: displayStore のフォント設定がそのまま反映される
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import type { ArrowBlock as ArrowBlockType, Attachment, BlockStyle } from "@/types/ptcl";
 import { useDisplayStore, FONT_CSS, type FontFamily } from "@/stores/displayStore";
 import { useSearchStore } from "@/stores/searchStore";
@@ -241,7 +241,8 @@ function SideRow({ att, selected, stemW, globalFont, onUpdate, onRemove, onNext 
     : rawDisplayHtml;
 
   // 選択状態になったとき contentEditable を att の内容で初期化する
-  useEffect(() => {
+  // useLayoutEffect: 描画前に innerHTML をセットし空の div にイベントが来る隙間をなくす
+  useLayoutEffect(() => {
     if (!selected || !editRef.current) return;
     editRef.current.innerHTML = att.richText ?? escapeHtml(att.text);
   // att の変更で実行するとカーソルが飛ぶため、selected の変化時のみ初期化
@@ -340,7 +341,7 @@ function LoopRow({ att, selected, onUpdate, onRemove, onNext, globalFont }: {
     ? highlightHtml(rawDisplayHtml, searchQuery, !!att.richText)
     : rawDisplayHtml;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!selected || !editRef.current) return;
     editRef.current.innerHTML = att.richText ?? escapeHtml(att.text);
   // eslint-disable-next-line react-hooks/exhaustive-deps

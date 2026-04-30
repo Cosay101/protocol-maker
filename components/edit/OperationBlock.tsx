@@ -11,7 +11,7 @@
 //
 // スタイルマージ:
 //   block.style（ブロック個別）が global displayStore より優先される。
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import type { OperationBlock as OperationBlockType } from "@/types/ptcl";
 import { useDisplayStore, FONT_CSS } from "@/stores/displayStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -76,6 +76,8 @@ export function OperationBlock({
   const overwriteCharRef = useRef<string | null>(null);
   // contentEditable を初期化済みか（React の再描画との衝突を防ぐ）
   const initializedRef = useRef(false);
+  // 上書きモードで innerHTML をセット済みか（IME の composition 開始時にクリアするため）
+  const overwriteWasSetRef = useRef(false);
 
   // 編集状態を uiStore に通知（リボンの B/I/U 無効化に使う）
   const setEditingBlockId = useUiStore((s) => s.setEditingBlockId);
@@ -113,7 +115,9 @@ export function OperationBlock({
   }, [editing, block.id, setEditingBlockId]);
 
   // 編集開始時: contentEditable を初期化してフォーカスを当てる
-  useEffect(() => {
+  // useLayoutEffect を使うことで「React が DOM を更新した直後・ブラウザ描画前」に
+  // innerHTML をセットし、ブラウザがまだ空の div にイベントを送れる隙間を無くす。
+  useLayoutEffect(() => {
     if (!editing || !editRef.current) return;
     const div = editRef.current;
 
@@ -123,11 +127,13 @@ export function OperationBlock({
       div.innerHTML = escapeHtml(overwrite);
       overwriteCharRef.current = null;
       initializedRef.current = true;
+      overwriteWasSetRef.current = true;
       moveCursorToEnd(div);
     } else {
       // 通常の編集開始: 既存コンテンツを設定
       div.innerHTML = block.richText ?? escapeHtml(block.text);
       initializedRef.current = true;
+      overwriteWasSetRef.current = false;
       div.focus();
 
       // クリック位置にカーソルを置く
@@ -172,6 +178,7 @@ export function OperationBlock({
     const isPlain = innerHTML === escapeHtml(innerText) || innerHTML === plainEquiv;
 
     initializedRef.current = false;
+    overwriteWasSetRef.current = false;
     setEditing(false);
     onTextChange(innerText, isPlain ? undefined : innerHTML);
   }, [onTextChange]);
@@ -319,6 +326,15 @@ export function OperationBlock({
           contentEditable
           suppressContentEditableWarning
           onBlur={handleEditBlur}
+          onCompositionStart={() => {
+            // 上書きモードで innerHTML に1文字セット済みの状態で IME が起動すると
+            // ブラウザがその文字に加えて IME の入力も挿入し二重になる。
+            // composition 開始時点で innerHTML をクリアして IME に白紙から書かせる。
+            if (overwriteWasSetRef.current && editRef.current) {
+              editRef.current.innerHTML = "";
+              overwriteWasSetRef.current = false;
+            }
+          }}
           onKeyDown={handleEditKeyDown}
           data-placeholder="ステップを入力…"
           style={{

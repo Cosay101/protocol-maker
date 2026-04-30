@@ -7,7 +7,7 @@
 //   - Del (選択中)        → 削除
 //   - Escape (編集中)     → 編集終了
 //   - 編集中にテキスト選択 → ミニフォーマットツールバー表示
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { TextFreeElement } from "@/types/ptcl";
 import { FONT_CSS, FONT_SIZES, type FontFamily } from "@/stores/displayStore";
 import { useSearchStore } from "@/stores/searchStore";
@@ -55,7 +55,9 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
   const savedRangesRef = useRef<Range[]>([]);
 
   // 編集開始時にフォーカスしてカーソルを末尾へ
-  useEffect(() => {
+  // useLayoutEffect: React DOM 更新直後・ブラウザ描画前に innerHTML をセットし
+  // 空の div にイベントが来る隙間をなくす。
+  useLayoutEffect(() => {
     if (!editing || !editRef.current) return;
     const div = editRef.current;
     div.innerHTML = el.text || "";
