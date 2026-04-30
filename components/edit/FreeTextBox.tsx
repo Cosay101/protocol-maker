@@ -165,6 +165,14 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
     const innerHTML = div.innerHTML;
     const innerText = div.innerText.trim();
     const isPlain = innerHTML === innerText || innerHTML === innerText.replace(/\n/g, "<br>");
+
+    // React は editing→display の切り替えで同じ DOM 要素を再利用する。
+    // 表示モードは子 <span dangerouslySetInnerHTML> を追加するが、
+    // contentEditable が書き込んだテキストノードは React が管理していないため
+    // 削除されず、span の内容と重複して "abcabc" のように表示される。
+    // setEditing(false) の前に innerHTML をクリアすることで防ぐ。
+    div.innerHTML = "";
+
     setEditing(false);
     onUpdate({ text: isPlain ? innerText : innerHTML });
   }
