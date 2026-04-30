@@ -133,8 +133,23 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
 
   function commitEdit() {
     if (!editRef.current) return;
-    const innerHTML = editRef.current.innerHTML;
-    const innerText = editRef.current.innerText.trim();
+    const div = editRef.current;
+
+    // beforeinput が先行して挿入した末尾の <br> / 空 <div> を除去する
+    while (div.lastChild) {
+      const last = div.lastChild;
+      if (last.nodeType === Node.ELEMENT_NODE) {
+        const el = last as HTMLElement;
+        if (el.tagName === "BR" || (el.tagName === "DIV" && el.innerHTML === "<br>")) {
+          div.removeChild(last);
+          continue;
+        }
+      }
+      break;
+    }
+
+    const innerHTML = div.innerHTML;
+    const innerText = div.innerText.trim();
     const isPlain = innerHTML === innerText || innerHTML === innerText.replace(/\n/g, "<br>");
     setEditing(false);
     onUpdate({ text: isPlain ? innerText : innerHTML });
@@ -324,6 +339,15 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
             contentEditable
             suppressContentEditableWarning
             onBlur={handleEditBlur}
+            onBeforeInput={(e) => {
+              // Tauri/WebView2 では beforeinput が keydown より先に発火し
+              // insertParagraph (Enter) が DOM に <div> を挿入してしまう。
+              // Shift+Enter (insertLineBreak) は改行として許可する。
+              const type = (e.nativeEvent as InputEvent).inputType;
+              if (type === "insertParagraph") {
+                e.preventDefault();
+              }
+            }}
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.nativeEvent.isComposing) return;

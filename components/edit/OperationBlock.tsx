@@ -169,7 +169,24 @@ export function OperationBlock({
 
   const commitEdit = useCallback(() => {
     if (!editRef.current) return;
+    if (!initializedRef.current) return; // 二重コミット防止
+
     const div = editRef.current;
+
+    // beforeinput が先行して挿入した末尾の <br> / 空 <div> を除去する
+    // (Tauri WebView2 では insertParagraph が keydown より先に DOM を書き換える)
+    while (div.lastChild) {
+      const last = div.lastChild;
+      if (last.nodeType === Node.ELEMENT_NODE) {
+        const el = last as HTMLElement;
+        if (el.tagName === "BR" || (el.tagName === "DIV" && el.innerHTML === "<br>")) {
+          div.removeChild(last);
+          continue;
+        }
+      }
+      break;
+    }
+
     const innerHTML = div.innerHTML;
     const innerText = div.innerText.trim();
 
@@ -333,6 +350,15 @@ export function OperationBlock({
             if (overwriteWasSetRef.current && editRef.current) {
               editRef.current.innerHTML = "";
               overwriteWasSetRef.current = false;
+            }
+          }}
+          onBeforeInput={(e) => {
+            // Tauri/WebView2 では beforeinput が keydown より先に発火し
+            // insertParagraph (Enter) / insertLineBreak (Shift+Enter) が
+            // DOM に <br>/<div> を挿入してしまう。ここで先手を打って防ぐ。
+            const type = (e.nativeEvent as InputEvent).inputType;
+            if (type === "insertParagraph" || type === "insertLineBreak") {
+              e.preventDefault();
             }
           }}
           onKeyDown={handleEditKeyDown}
