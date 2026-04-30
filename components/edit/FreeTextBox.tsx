@@ -71,6 +71,20 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  // beforeinput をネイティブリスナーで直接ブロック（insertParagraph = Enter のみ）
+  // Shift+Enter (insertLineBreak) は改行として許可する。
+  useEffect(() => {
+    if (!editing || !editRef.current) return;
+    const div = editRef.current;
+    const handler = (e: InputEvent) => {
+      if (e.inputType === "insertParagraph") {
+        e.preventDefault();
+      }
+    };
+    div.addEventListener("beforeinput", handler);
+    return () => div.removeEventListener("beforeinput", handler);
+  }, [editing]);
+
   // 編集中: テキスト選択の監視 → ミニツールバー表示制御
   useEffect(() => {
     if (!editing) {
@@ -339,15 +353,6 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
             contentEditable
             suppressContentEditableWarning
             onBlur={handleEditBlur}
-            onBeforeInput={(e) => {
-              // Tauri/WebView2 では beforeinput が keydown より先に発火し
-              // insertParagraph (Enter) が DOM に <div> を挿入してしまう。
-              // Shift+Enter (insertLineBreak) は改行として許可する。
-              const type = (e.nativeEvent as InputEvent).inputType;
-              if (type === "insertParagraph") {
-                e.preventDefault();
-              }
-            }}
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.nativeEvent.isComposing) return;

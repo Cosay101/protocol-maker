@@ -114,6 +114,21 @@ export function OperationBlock({
     return () => setEditingBlockId(null);
   }, [editing, block.id, setEditingBlockId]);
 
+  // beforeinput をネイティブリスナーで直接ブロック
+  // React の onBeforeInput はルート委譲のため、DOM 挿入が先に起きてから
+  // preventDefault が呼ばれる（手遅れ）。element に直接アタッチすることで解決する。
+  useEffect(() => {
+    if (!editing || !editRef.current) return;
+    const div = editRef.current;
+    const handler = (e: InputEvent) => {
+      if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
+        e.preventDefault();
+      }
+    };
+    div.addEventListener("beforeinput", handler);
+    return () => div.removeEventListener("beforeinput", handler);
+  }, [editing]);
+
   // 編集開始時: contentEditable を初期化してフォーカスを当てる
   // useLayoutEffect を使うことで「React が DOM を更新した直後・ブラウザ描画前」に
   // innerHTML をセットし、ブラウザがまだ空の div にイベントを送れる隙間を無くす。
@@ -350,15 +365,6 @@ export function OperationBlock({
             if (overwriteWasSetRef.current && editRef.current) {
               editRef.current.innerHTML = "";
               overwriteWasSetRef.current = false;
-            }
-          }}
-          onBeforeInput={(e) => {
-            // Tauri/WebView2 では beforeinput が keydown より先に発火し
-            // insertParagraph (Enter) / insertLineBreak (Shift+Enter) が
-            // DOM に <br>/<div> を挿入してしまう。ここで先手を打って防ぐ。
-            const type = (e.nativeEvent as InputEvent).inputType;
-            if (type === "insertParagraph" || type === "insertLineBreak") {
-              e.preventDefault();
             }
           }}
           onKeyDown={handleEditKeyDown}
