@@ -3,7 +3,7 @@
 // - アップロード済み画像のサムネイル一覧
 // - クリックで挿入、ホバーで削除ボタン表示
 // - 下部に「画像をアップロード」ボタン（複数ファイル対応）
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useImageLibraryStore, type LibraryImage } from "@/stores/imageLibraryStore";
 
@@ -22,6 +22,7 @@ export function ImagePalette({ anchorRect, onInsert, onClose }: Props) {
   const removeImage = useImageLibraryStore((s) => s.removeImage);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // パネル外クリックで閉じる
   useEffect(() => {
@@ -44,11 +45,26 @@ export function ImagePalette({ anchorRect, onInsert, onClose }: Props) {
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
+      setUploadError(null);
       files.forEach((file) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const src = ev.target?.result as string;
-          if (src) addImage(file.name, src);
+          if (!src) return;
+          try {
+            addImage(file.name, src);
+          } catch (err) {
+            // IndexedDB ストレージでも容量超過や権限エラーが起きた場合
+            const msg =
+              err instanceof DOMException
+                ? `保存に失敗しました: ${err.message}`
+                : "画像の保存に失敗しました。";
+            setUploadError(msg);
+            console.error("[ImagePalette] addImage error:", err);
+          }
+        };
+        reader.onerror = () => {
+          setUploadError(`「${file.name}」の読み込みに失敗しました。`);
         };
         reader.readAsDataURL(file);
       });
@@ -145,6 +161,11 @@ export function ImagePalette({ anchorRect, onInsert, onClose }: Props) {
         <p className="mt-1.5 text-center text-[9px] text-neutral-300">
           PNG / JPG / SVG / GIF / WebP 対応
         </p>
+        {uploadError && (
+          <p className="mt-1.5 rounded bg-red-50 px-2 py-1 text-center text-[10px] text-red-500">
+            {uploadError}
+          </p>
+        )}
       </div>
     </div>
   );
