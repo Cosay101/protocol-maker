@@ -1939,8 +1939,16 @@ function RichHeaderRow({
 
   function handleFocus() {
     setIsFocused(true);
-    // ハイライトを取り除いてクリーンな内容を復元
-    if (editRef.current) editRef.current.innerHTML = cleanHtmlRef.current;
+    if (editRef.current) {
+      // 検索ハイライト（<mark class="ptcl-hl">）が残っている場合のみ innerHTML を
+      // クリーンな内容に差し替える。
+      // restoreSelection() → ce.focus() によってフォーカスが当たるケースでは
+      // DOM を再構築すると保存済み選択範囲のノード参照が無効になるため、
+      // ハイライトがないときは innerHTML を上書きしない。
+      if (editRef.current.querySelector(".ptcl-hl")) {
+        editRef.current.innerHTML = cleanHtmlRef.current;
+      }
+    }
   }
 
   function handleBlur() {
@@ -1951,10 +1959,9 @@ function RichHeaderRow({
       if (!editRef.current) return;
       const innerHTML = editRef.current.innerHTML;
       const innerText = editRef.current.innerText.trim();
-      // プレーンテキスト判定（<br> のみはプレーン扱い）
-      const isPlain =
-        innerHTML === innerText ||
-        innerHTML === innerText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      // プレーンテキスト判定: <span> / <b> などインライン要素がなければプレーン扱い
+      const hasInlineMarkup = /<[a-z]/i.test(innerHTML);
+      const isPlain = !hasInlineMarkup;
       const newClean = isPlain ? innerText : innerHTML;
       cleanHtmlRef.current = newClean;
       // prevInitialHtmlRef も先行更新しておく。
