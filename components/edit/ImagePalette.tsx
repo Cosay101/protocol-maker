@@ -73,13 +73,20 @@ export function ImagePalette({ anchorRect, onInsert, onClose }: Props) {
     [addImage],
   );
 
+  // パネル幅 (w-72 = 288px) が画面右端をはみ出さないよう left を補正
+  const PANEL_W = 288;
+  const clampedLeft = Math.min(
+    anchorRect.left,
+    Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 1280) - PANEL_W - 8),
+  );
+
   const panel = (
     <div
       ref={panelRef}
       style={{
         position: "fixed",
         top: anchorRect.bottom + 4,
-        left: anchorRect.left,
+        left: clampedLeft,
         zIndex: 9999,
       }}
       className="w-72 rounded-xl border border-neutral-200 bg-white shadow-xl"

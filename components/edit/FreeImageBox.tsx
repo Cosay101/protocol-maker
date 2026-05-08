@@ -17,6 +17,8 @@ type Props = {
   onSelect: () => void;
   onUpdate: (patch: Patch) => void;
   onDelete: () => void;
+  /** マルチドラッグ開始通知 */
+  onMoveStart?: () => void;
 };
 
 // 8 方向リサイズハンドル
@@ -34,7 +36,7 @@ const HANDLE_STYLE: Record<HandleDir, React.CSSProperties> = {
   nw: { top: -5,    left: -5,                                     cursor: "nw-resize" },
 };
 
-export function FreeImageBox({ el, selected, onSelect, onUpdate, onDelete }: Props) {
+export function FreeImageBox({ el, selected, onSelect, onUpdate, onDelete, onMoveStart }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rotation = el.rotation ?? 0;
 
@@ -44,6 +46,7 @@ export function FreeImageBox({ el, selected, onSelect, onUpdate, onDelete }: Pro
       e.stopPropagation();
       e.preventDefault();
       onSelect();
+      onMoveStart?.();
       const startX = e.clientX, startY = e.clientY;
       const baseX = el.x, baseY = el.y;
       function onMouseMove(ev: MouseEvent) {
@@ -56,7 +59,7 @@ export function FreeImageBox({ el, selected, onSelect, onUpdate, onDelete }: Pro
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
     },
-    [el.x, el.y, onSelect, onUpdate],
+    [el.x, el.y, onSelect, onUpdate, onMoveStart],
   );
 
   // ---- リサイズドラッグ（回転を考慮した座標変換）----

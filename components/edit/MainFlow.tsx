@@ -31,6 +31,7 @@ type Props = {
   onAddAttachment: (anchorId: string, kind: "side-in" | "side-out" | "loop", text: string) => void;
   onUpdateAttachment: (id: string, text: string, richText?: string) => void;
   onRemoveAttachment: (id: string) => void;
+  onReorderAttachments?: (orderedIds: string[]) => void;
   onInsertSpacer: (beforeBlockIndex: number) => void;
   onUpdateSpacerHeight: (blockId: string, h: number) => void;
   onDeleteSpacer: (blockId: string) => void;
@@ -59,6 +60,7 @@ export function MainFlow({
   onAddAttachment,
   onUpdateAttachment,
   onRemoveAttachment,
+  onReorderAttachments,
   onInsertSpacer,
   onUpdateSpacerHeight,
   onDeleteSpacer,
@@ -199,6 +201,7 @@ export function MainFlow({
           onAddAttachment={(kind, text) => onAddAttachment(block.id, kind, text)}
           onUpdateAttachment={onUpdateAttachment}
           onRemoveAttachment={onRemoveAttachment}
+          onReorderAttachments={onReorderAttachments}
           onNext={() => onArrowNext(globalI)}
         />,
       );
@@ -245,10 +248,14 @@ export function MainFlow({
     }
   }
 
-  // 末尾 InsertGap: 最後のブロックが arrow の場合は ArrowBlock が内部で持つので不要
+  // 末尾 InsertGap:
+  //   - arrow   → ArrowBlock が内部に持つので不要
+  //   - operation / spacer → ループ内で既に InsertGap を追加済みなので不要
+  //   - columnBreak → ループ内で追加していないので必要
+  //   - ブロックなし → 先頭ギャップだけでは不十分なので必要
   if (!dragId) {
     const lastBlock = blocks[blocks.length - 1];
-    if (!lastBlock || lastBlock.type !== "arrow") {
+    if (!lastBlock || lastBlock.type === "columnBreak") {
       const tailGlobalIndex = blockOffset + blocks.length;
       elements.push(
         <InsertGap

@@ -20,6 +20,8 @@ type Props = {
   onSelect: () => void;
   onUpdate: (patch: Partial<Omit<ArrowFreeElement, "id" | "type">>) => void;
   onDelete: () => void;
+  /** マルチドラッグ開始通知 */
+  onMoveStart?: () => void;
 };
 
 const HANDLE_R  = 6;    // 制御点ハンドル半径 (px)
@@ -78,7 +80,7 @@ function startWindowDrag(
   window.addEventListener("pointerup",   onPointerup);
 }
 
-export function FreeArrowBox({ el, selected, onSelect, onUpdate, onDelete }: Props) {
+export function FreeArrowBox({ el, selected, onSelect, onUpdate, onDelete, onMoveStart }: Props) {
   const { points, color, strokeWidth } = el;
   const [hovered, setHovered] = useState(false);
 
@@ -97,6 +99,7 @@ export function FreeArrowBox({ el, selected, onSelect, onUpdate, onDelete }: Pro
     }
 
     // 全体ドラッグ: ドラッグ開始時の全点をスナップショット
+    onMoveStart?.();
     const startPts = points.map((p) => ({ ...p }));
     startWindowDrag(e.clientX, e.clientY, (dx, dy) => {
       onUpdate({ points: startPts.map((p) => ({ x: p.x + dx, y: p.y + dy })) });

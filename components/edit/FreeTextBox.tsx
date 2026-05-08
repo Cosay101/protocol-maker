@@ -21,6 +21,8 @@ type Props = {
   onSelect: () => void;
   onUpdate: (patch: Patch) => void;
   onDelete: () => void;
+  /** マルチドラッグ開始通知（グループ全体の base 座標を記録するため） */
+  onMoveStart?: () => void;
 };
 
 // 8 方向のリサイズハンドル
@@ -38,7 +40,7 @@ const HANDLE_STYLE: Record<HandleDir, React.CSSProperties> = {
   nw: { top: -4, left: -4,                                     cursor: "nw-resize" },
 };
 
-export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Props) {
+export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete, onMoveStart }: Props) {
   const [editing, setEditing] = useState(false);
 
   // ブロックレベルのフォントスタイル（リボンから設定・インライン書式で上書き可能）
@@ -194,6 +196,7 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
       e.stopPropagation();
       e.preventDefault();
       onSelect();
+      onMoveStart?.();
 
       const startX = e.clientX;
       const startY = e.clientY;
@@ -210,7 +213,7 @@ export function FreeTextBox({ el, selected, onSelect, onUpdate, onDelete }: Prop
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup",   onMouseUp);
     },
-    [editing, el.x, el.y, onSelect, onUpdate],
+    [editing, el.x, el.y, onSelect, onUpdate, onMoveStart],
   );
 
   // ---- リサイズドラッグ ----

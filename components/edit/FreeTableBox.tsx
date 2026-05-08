@@ -41,6 +41,8 @@ type Props = {
   onUpdate: (patch: Partial<Omit<TableFreeElement, "id" | "type">>) => void;
   onUpdateCell: (row: number, col: number, patch: CellPatch) => void;
   onDelete: () => void;
+  /** マルチドラッグ開始通知 */
+  onMoveStart?: () => void;
 };
 
 // グリッド線クリック感知幅 (px) — 線の両側合計 BORDER_HIT*2 px が反応
@@ -60,7 +62,7 @@ const HANDLE_STYLE: Record<HandleDir, React.CSSProperties> = {
   nw: { top: -5,    left: -5,                                     cursor: "nw-resize" },
 };
 
-export function FreeTableBox({ el, selected, onSelect, onUpdate, onUpdateCell, onDelete }: Props) {
+export function FreeTableBox({ el, selected, onSelect, onUpdate, onUpdateCell, onDelete, onMoveStart }: Props) {
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number } | null>(null);
   const [editingCell, setEditingCell]   = useState<{ row: number; col: number } | null>(null);
   const editRef      = useRef<HTMLDivElement>(null);
@@ -192,12 +194,14 @@ export function FreeTableBox({ el, selected, onSelect, onUpdate, onUpdateCell, o
       const startX = e.clientX, startY = e.clientY;
       const baseX = el.x, baseY = el.y;
       let moved = false;
+      let moveStartNotified = false;
 
       function onMouseMove(ev: MouseEvent) {
         if (!moved && (Math.abs(ev.clientX - startX) > 3 || Math.abs(ev.clientY - startY) > 3)) {
           moved = true;
         }
         if (moved) {
+          if (!moveStartNotified) { moveStartNotified = true; onMoveStart?.(); }
           onUpdate({ x: baseX + ev.clientX - startX, y: baseY + ev.clientY - startY });
         }
       }
@@ -219,7 +223,7 @@ export function FreeTableBox({ el, selected, onSelect, onUpdate, onUpdateCell, o
       window.addEventListener("mouseup",   onMouseUp);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [el.x, el.y, el.w, el.h, el.rows, el.cols, el.colWidths, el.rowHeights, editingCell, onSelect, onUpdate],
+    [el.x, el.y, el.w, el.h, el.rows, el.cols, el.colWidths, el.rowHeights, editingCell, onSelect, onUpdate, onMoveStart],
   );
 
   // ---- リサイズ ----

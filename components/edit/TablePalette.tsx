@@ -45,13 +45,20 @@ export function TablePalette({ anchorRect, onClose }: Props) {
   const previewRows = Math.min(rows, 6);
   const previewCols = Math.min(cols, 6);
 
+  // パネル幅 (w-64 = 256px) が画面右端をはみ出さないよう left を補正
+  const PANEL_W = 256;
+  const clampedLeft = Math.min(
+    anchorRect.left,
+    Math.max(8, (typeof window !== "undefined" ? window.innerWidth : 1280) - PANEL_W - 8),
+  );
+
   const panel = (
     <div
       ref={panelRef}
       style={{
         position: "fixed",
         top: anchorRect.bottom + 4,
-        left: anchorRect.left,
+        left: clampedLeft,
         zIndex: 9999,
       }}
       className="w-64 rounded-xl border border-neutral-200 bg-white p-3 shadow-xl"

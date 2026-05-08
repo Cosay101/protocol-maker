@@ -6,39 +6,38 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and release
+      - name: Build & Release (Tauri)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Protocol Maker ${{ github.ref_name }}'
-          releaseBody: 'バグ修正・機能改善'
+          releaseBody: |
+            ## インストール方法
+            `Assets` から `Protocol-Maker_x.x.x_ja-JP_x64-setup.exe` をダウンロードして実行してください。
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}

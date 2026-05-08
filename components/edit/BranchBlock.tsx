@@ -54,8 +54,8 @@ export function BranchBlock({ block, selected, colW, onSelect, onUpdate, onDelet
   const commitYes  = useEditableField(yesRef,   selected, block.yesLabel,  (v) => onUpdate({ yesLabel: v }));
   const commitNo   = useEditableField(noRef,    selected, block.noLabel,   (v) => onUpdate({ noLabel: v }));
 
-  const borderColor = selected ? "#60a5fa" : "#9ca3af";
-  const forkColor   = selected ? "#93c5fd" : "#d1d5db";
+  const borderColor = "#9ca3af";
+  const forkColor   = "#d1d5db";
 
   // SVG フォーク線の座標
   const midX    = colW / 2;
@@ -67,7 +67,7 @@ export function BranchBlock({ block, selected, colW, onSelect, onUpdate, onDelet
     <div
       className={[
         "group relative select-none rounded-md transition-colors",
-        selected ? "bg-blue-50" : "cursor-pointer hover:bg-neutral-50",
+        "cursor-pointer hover:bg-neutral-50",
       ].join(" ")}
       style={{ width: colW }}
       onClick={(e) => { e.stopPropagation(); if (!selected) onSelect(); }}
@@ -175,7 +175,7 @@ export function BranchBlock({ block, selected, colW, onSelect, onUpdate, onDelet
         className={[
           "absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full",
           "text-[10px] text-neutral-300 transition-[opacity,color] hover:text-red-400",
-          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          "opacity-0 group-hover:opacity-100",
         ].join(" ")}
         tabIndex={-1}
         aria-label="削除"

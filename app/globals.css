@@ -77,7 +77,7 @@ body {
    印刷 / PDF 出力用スタイル
    ================================================================ */
 @media print {
-  /* ツールバー・タブバーを非表示 */
+  /* ツールバー・タブバー・UI操作要素を非表示 */
   [data-no-print],
   [data-ribbon] {
     display: none !important;
@@ -106,9 +106,10 @@ body {
     gap: 0 !important;
   }
 
-  /* 各ページシート：影を除去、ページ区切りを設定 */
+  /* 各ページシート：影を除去、はみ出しを隠す、ページ区切りを設定 */
   [data-page-sheet] {
     box-shadow: none !important;
+    overflow: hidden !important;   /* SVGオーバーレイのはみ出しをクリップ */
     break-after: page;
     page-break-after: always;
     width: 100% !important;
@@ -118,6 +119,12 @@ body {
   [data-page-sheet]:last-child {
     break-after: avoid;
     page-break-after: avoid;
+  }
+
+  /* フォント・背景色を印刷時も正確に再現 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 

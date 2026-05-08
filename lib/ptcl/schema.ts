@@ -130,8 +130,23 @@ export const BranchFlowSchema = z.object({
   id: Id,
   /** 分岐元の矢印 ID（mainFlow.blocks 内の arrow ブロック） */
   sourceArrowId: Id,
-  /** 合流先の矢印 ID（mainFlow.blocks 内の arrow ブロック）。null = 未合流 */
-  mergeTargetArrowId: Id.nullable().default(null),
+  /**
+   * 分岐元矢印ブロック内の接続ギャップ。
+   * null = 全行より上（ブロック上端）、アタッチメント ID = その行の下端、省略時は全行より下（ブロック下端）
+   */
+  sourceGapAfter: z.string().nullable().optional(),
+  /**
+   * 合流先ブロック ID（arrow または operation ブロック）。null = 未合流。
+   * 旧フィールド mergeTargetArrowId との後方互換のため optional で残す。
+   */
+  mergeTargetId: Id.nullable().default(null),
+  /** 後方互換: 旧ファイルに含まれる可能性があるため optional で読む */
+  mergeTargetArrowId: Id.nullable().optional(),
+  /**
+   * 合流先ブロック内の接続ギャップ。
+   * null = 全行より上（ブロック上端）、アタッチメント ID = その行の下端、省略時は全行より下（ブロック下端）
+   */
+  mergeGapAfter: z.string().nullable().optional(),
   blocks: z.array(BranchFlowBlockSchema).default([]),
   attachments: z.array(AttachmentSchema).default([]),
 });

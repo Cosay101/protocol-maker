@@ -323,7 +323,7 @@ export function OperationBlock({
       className={[
         "group flex select-none items-start rounded-md py-1",
         "transition-[background,opacity]",
-        selected ? "bg-blue-50" : "cursor-pointer hover:bg-neutral-50",
+        "cursor-pointer hover:bg-neutral-50",
         isDragging ? "opacity-40" : "",
       ].join(" ")}
       style={{
@@ -332,10 +332,12 @@ export function OperationBlock({
         minWidth: "100%",
         width: "max-content",
       }}
+      data-conn-block={block.id}
       {...dragProps}
     >
       {/* ドラッグハンドル */}
       <div
+        data-no-print
         className={[
           "mt-2 shrink-0 px-1.5 text-sm transition-colors",
           editing
@@ -413,7 +415,7 @@ export function OperationBlock({
         }}
         className={[
           "mt-2 shrink-0 px-1.5 text-xs text-neutral-300 transition-[opacity,color] hover:text-red-400",
-          selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          "opacity-0 group-hover:opacity-100",
         ].join(" ")}
         tabIndex={-1}
         aria-label="削除"

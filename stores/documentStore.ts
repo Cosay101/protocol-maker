@@ -1,7 +1,7 @@
 // 現在開いている PtclDocument を保持するストア。
 // 全ての mainFlow 変更は normalize() を通して不変条件を保つ。
 import { create } from "zustand";
-import type { PtclDocument, Meta, Page, BlockStyle, MainFlowBlock, TextFreeElement, ImageFreeElement, TableFreeElement, TableCell, ArrowFreeElement, BranchFlow } from "@/types/ptcl";
+import type { PtclDocument, Meta, Page, BlockStyle, MainFlowBlock, TextFreeElement, ImageFreeElement, TableFreeElement, TableCell, ArrowFreeElement, BranchFlow, FreeElement } from "@/types/ptcl";
 import { createEmptyDocument } from "@/lib/ptcl/io";
 import { normalizeMainFlow, normalizeBranchFlow } from "@/lib/ptcl/normalize";
 import { newBlockId, newAttachmentId, newFreeElementId } from "@/lib/id";
@@ -14,6 +14,8 @@ export type DocumentState = {
   isDirty: boolean;
   /** アンドゥ履歴（最新が末尾） */
   history: PtclDocument[];
+  /** リドゥ履歴（次の状態が先頭） */
+  future: PtclDocument[];
 
   // ---- ドキュメント全体 ----
   setDocument: (doc: PtclDocument, path: string | null) => void;
@@ -22,6 +24,8 @@ export type DocumentState = {
   markSaved: (path: string) => void;
   /** 直前の状態に戻す（Ctrl+Z） */
   undo: () => void;
+  /** やり直し（Ctrl+Y / Ctrl+Shift+Z） */
+  redo: () => void;
 
   // ---- meta ----
   setMeta: (patch: Partial<Meta>) => void;
@@ -48,6 +52,8 @@ export type DocumentState = {
   updateAttachmentStyle: (id: string, style: Partial<BlockStyle>) => void;
   /** アタッチメントを削除する */
   removeAttachment: (id: string) => void;
+  /** アタッチメントの順番を orderedIds の順序に従って更新する */
+  reorderAttachments: (orderedIds: string[]) => void;
 
   // ---- mainFlow: branch (旧・UI 廃止済み) ----
   insertBranch: (beforeBlockIndex: number) => string;
@@ -72,8 +78,10 @@ export type DocumentState = {
   insertBranchSpacer: (branchFlowId: string, beforeBlockIndex: number, h?: number) => string;
   /** 分岐列のスペーサー高さを更新する */
   updateBranchSpacerHeight: (branchFlowId: string, blockId: string, h: number) => void;
-  /** 分岐列の合流先矢印 ID を設定する（null = 未合流） */
-  setBranchMergeTarget: (branchFlowId: string, targetArrowId: string | null) => void;
+  /** 分岐列の合流先ブロック ID（arrow or op）とギャップを設定する（null = 未合流） */
+  setBranchMergeTarget: (branchFlowId: string, targetId: string | null, gapAfter?: string | null) => void;
+  /** 分岐列の分岐元矢印 ID とギャップを変更する */
+  setBranchSourceArrow: (branchFlowId: string, arrowId: string, gapAfter?: string | null) => void;
   /** 分岐列をドキュメントから削除する */
   removeBranchFlow: (branchFlowId: string) => void;
 
@@ -115,6 +123,11 @@ export type DocumentState = {
   /** 自由矢印の制御点・スタイルを更新する */
   updateFreeArrowElement: (id: string, patch: Partial<Omit<ArrowFreeElement, "id" | "type">>) => void;
 
+  /** 自由配置要素をクローンして追加する（Ctrl+V 用）。新しい id を返す */
+  cloneFreeElements: (elements: FreeElement[], offsetX?: number, offsetY?: number) => string[];
+  /** 複数の自由配置要素を一括で絶対座標へ移動する（マルチドラッグ用） */
+  moveFreeElementsBulk: (moves: Array<{ id: string; x?: number; y?: number; points?: { x: number; y: number }[] }>) => void;
+
   /**
    * ドキュメント全体で query にマッチするすべてのテキストを replacement に置換する。
    * 対象: ヘッダー / OperationBlock / Attachment / FreeTextBox / TableCell
@@ -123,7 +136,8 @@ export type DocumentState = {
 };
 
 /** doc が null のときに mutation を呼ばないためのガード。
- *  doc が変化する場合は自動的に履歴に積む（最大 50 件）。 */
+ *  doc が変化する場合は自動的に履歴に積む（最大 50 件）。
+ *  新しい変更が入ったらリドゥ履歴をクリアする。 */
 function withDoc(
   state: DocumentState,
   fn: (doc: PtclDocument) => Partial<DocumentState>,
@@ -134,6 +148,7 @@ function withDoc(
     return {
       ...result,
       history: [...(state.history ?? []).slice(-49), state.doc],
+      future: [], // 新しい変更でリドゥ履歴をクリア
     };
   }
   return result;
@@ -144,11 +159,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   path: null,
   isDirty: false,
   history: [],
+  future: [],
 
-  setDocument: (doc, path) => set({ doc, path, isDirty: false, history: [] }),
-  clearDocument: () => set({ doc: null, path: null, isDirty: false, history: [] }),
+  setDocument: (doc, path) => set({ doc, path, isDirty: false, history: [], future: [] }),
+  clearDocument: () => set({ doc: null, path: null, isDirty: false, history: [], future: [] }),
   createNew: () =>
-    set({ doc: createEmptyDocument(), path: null, isDirty: false, history: [] }),
+    set({ doc: createEmptyDocument(), path: null, isDirty: false, history: [], future: [] }),
   markSaved: (path) => set({ path, isDirty: false }),
 
   undo: () =>
@@ -158,6 +174,19 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return {
         doc: prev,
         history: s.history.slice(0, -1),
+        future: s.doc ? [s.doc, ...s.future.slice(0, 49)] : s.future,
+        isDirty: true,
+      };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (!s.future.length) return {};
+      const next = s.future[0];
+      return {
+        doc: next,
+        future: s.future.slice(1),
+        history: s.doc ? [...(s.history ?? []).slice(-49), s.doc] : s.history,
         isDirty: true,
       };
     }),
@@ -357,6 +386,24 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       })),
     ),
 
+  reorderAttachments: (orderedIds) =>
+    set((s) =>
+      withDoc(s, (doc) => ({
+        doc: {
+          ...doc,
+          mainFlow: {
+            ...doc.mainFlow,
+            attachments: doc.mainFlow.attachments.map((a) => {
+              const newOrder = orderedIds.indexOf(a.id);
+              return newOrder < 0 ? a : { ...a, order: newOrder };
+            }),
+          },
+          meta: { ...doc.meta, updatedAt: nowIso() },
+        },
+        isDirty: true,
+      })),
+    ),
+
   addFreeTextElement: (x, y, w = 160, h = 60) => {
     const id = newFreeElementId();
     set((s) =>
@@ -515,7 +562,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             ...doc.mainFlow,
             branchFlows: [
               ...(doc.mainFlow.branchFlows ?? []),
-              { id, sourceArrowId, mergeTargetArrowId: null, blocks: [], attachments: [] } satisfies BranchFlow,
+              { id, sourceArrowId, mergeTargetId: null, blocks: [], attachments: [] } satisfies BranchFlow,
             ],
           },
           meta: { ...doc.meta, updatedAt: nowIso() },
@@ -686,7 +733,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       })),
     ),
 
-  setBranchMergeTarget: (branchFlowId, targetArrowId) =>
+  setBranchMergeTarget: (branchFlowId, targetId, gapAfter) =>
     set((s) =>
       withDoc(s, (doc) => ({
         doc: {
@@ -694,7 +741,36 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           mainFlow: {
             ...doc.mainFlow,
             branchFlows: (doc.mainFlow.branchFlows ?? []).map((bf) =>
-              bf.id === branchFlowId ? { ...bf, mergeTargetArrowId: targetArrowId } : bf,
+              bf.id === branchFlowId
+                ? {
+                    ...bf,
+                    mergeTargetId: targetId,
+                    ...(gapAfter !== undefined ? { mergeGapAfter: gapAfter } : {}),
+                  }
+                : bf,
+            ),
+          },
+          meta: { ...doc.meta, updatedAt: nowIso() },
+        },
+        isDirty: true,
+      })),
+    ),
+
+  setBranchSourceArrow: (branchFlowId, arrowId, gapAfter) =>
+    set((s) =>
+      withDoc(s, (doc) => ({
+        doc: {
+          ...doc,
+          mainFlow: {
+            ...doc.mainFlow,
+            branchFlows: (doc.mainFlow.branchFlows ?? []).map((bf) =>
+              bf.id === branchFlowId
+                ? {
+                    ...bf,
+                    sourceArrowId: arrowId,
+                    ...(gapAfter !== undefined ? { sourceGapAfter: gapAfter } : {}),
+                  }
+                : bf,
             ),
           },
           meta: { ...doc.meta, updatedAt: nowIso() },
@@ -865,6 +941,56 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         },
         isDirty: true,
       })),
+    ),
+
+  cloneFreeElements: (elements, offsetX = 20, offsetY = 20) => {
+    const newIds: string[] = [];
+    set((s) =>
+      withDoc(s, (doc) => {
+        const clones: FreeElement[] = elements.map((el) => {
+          const id = newFreeElementId();
+          newIds.push(id);
+          if (el.type === "arrow") {
+            return { ...el, id, points: el.points.map((p) => ({ x: p.x + offsetX, y: p.y + offsetY })) };
+          }
+          return { ...el, id, x: el.x + offsetX, y: el.y + offsetY };
+        });
+        return {
+          doc: {
+            ...doc,
+            freeElements: [...doc.freeElements, ...clones],
+            meta: { ...doc.meta, updatedAt: nowIso() },
+          },
+          isDirty: true,
+        };
+      }),
+    );
+    return newIds;
+  },
+
+  moveFreeElementsBulk: (moves) =>
+    set((s) =>
+      withDoc(s, (doc) => {
+        const moveMap = new Map(moves.map((m) => [m.id, m]));
+        return {
+          doc: {
+            ...doc,
+            freeElements: doc.freeElements.map((el) => {
+              const m = moveMap.get(el.id);
+              if (!m) return el;
+              if (el.type === "arrow" && m.points) {
+                return { ...el, points: m.points };
+              }
+              if (el.type !== "arrow" && m.x !== undefined && m.y !== undefined) {
+                return { ...el, x: m.x, y: m.y };
+              }
+              return el;
+            }),
+            meta: { ...doc.meta, updatedAt: nowIso() },
+          },
+          isDirty: true,
+        };
+      }),
     ),
 
   replaceAll: (query, replacement) => {

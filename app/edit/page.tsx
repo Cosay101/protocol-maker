@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useDocumentStore } from "@/stores/documentStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useDisplayStore, FONT_SIZES, FONT_CSS, type FontFamily, type TextAlign } from "@/stores/displayStore";
-import type { TextFreeElement, ImageFreeElement, TableFreeElement, TableCell } from "@/types/ptcl";
+import type { TextFreeElement, ImageFreeElement, TableFreeElement, TableCell, FreeElement } from "@/types/ptcl";
 import { MainFlow } from "@/components/edit/MainFlow";
 import { BranchColumn } from "@/components/edit/BranchColumn";
 import { FreeTextBox } from "@/components/edit/FreeTextBox";
@@ -150,6 +150,12 @@ function Ribbon() {
     textAlign: gTextAlign, setTextAlign,
     blockGap, setBlockGap, adjustBlockGap,
   } = useDisplayStore();
+
+  // アンドゥ / リドゥ
+  const undo      = useDocumentStore((s) => s.undo);
+  const redo      = useDocumentStore((s) => s.redo);
+  const canUndo   = useDocumentStore((s) => s.history.length > 0);
+  const canRedo   = useDocumentStore((s) => s.future.length > 0);
 
   // ドキュメント・キャレット
   const caret = useUiStore((s) => s.caret);
@@ -609,35 +615,28 @@ function Ribbon() {
   return (
     <div
       data-ribbon
-      className="flex h-14 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-neutral-200 bg-white px-4 text-neutral-700"
+      className="flex h-14 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-neutral-200 bg-white px-4 text-neutral-700 [&::-webkit-scrollbar]:hidden"
     >
       {/* ===== 書式グループ ===== */}
 
-      {/* スコープバッジ */}
-      {isBlock && (
-        <span
-          className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600"
-          title="選択中のブロックに適用"
-        >
-          ブロック
-        </span>
-      )}
-      {selFreeEl && !isBlock && (
-        <span
-          className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600"
-          title="選択中のテキストボックスに適用"
-        >
-          ボックス
-        </span>
-      )}
-      {focusedAttachmentId && !hasTextSelection && (
-        <span
-          className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600"
-          title="フォーカス中の特殊アクションラベルに適用"
-        >
-          アタッチ
-        </span>
-      )}
+
+      {/* アンドゥ / リドゥ */}
+      <RibbonBtn
+        disabled={!canUndo}
+        title="元に戻す (Ctrl+Z)"
+        onClick={undo}
+      >
+        ↩
+      </RibbonBtn>
+      <RibbonBtn
+        disabled={!canRedo}
+        title="やり直し (Ctrl+Y)"
+        onClick={redo}
+      >
+        ↪
+      </RibbonBtn>
+
+      <RibbonDivider />
 
       {/* フォント種別 */}
       <select
@@ -928,6 +927,7 @@ function PageCanvas() {
   const addAttachment = useDocumentStore((s) => s.addAttachment);
   const updateAttachment = useDocumentStore((s) => s.updateAttachment);
   const removeAttachment = useDocumentStore((s) => s.removeAttachment);
+  const reorderAttachments = useDocumentStore((s) => s.reorderAttachments);
   const moveBlock = useDocumentStore((s) => s.moveBlock);
   const addFreeTextElement  = useDocumentStore((s) => s.addFreeTextElement);
   const updateFreeElement   = useDocumentStore((s) => s.updateFreeElement);
@@ -944,21 +944,27 @@ function PageCanvas() {
   const insertBranchSpacer  = useDocumentStore((s) => s.insertBranchSpacer);
   const updateBranchSpacerHeight = useDocumentStore((s) => s.updateBranchSpacerHeight);
   const setBranchMergeTarget = useDocumentStore((s) => s.setBranchMergeTarget);
+  const setBranchSourceArrow = useDocumentStore((s) => s.setBranchSourceArrow);
   const moveBranchBlock     = useDocumentStore((s) => s.moveBranchBlock);
   const removeBranchFlow    = useDocumentStore((s) => s.removeBranchFlow);
   const addFreeArrowElement    = useDocumentStore((s) => s.addFreeArrowElement);
   const updateFreeArrowElement = useDocumentStore((s) => s.updateFreeArrowElement);
+  const cloneFreeElements      = useDocumentStore((s) => s.cloneFreeElements);
+  const moveFreeElementsBulk   = useDocumentStore((s) => s.moveFreeElementsBulk);
   const updateTableCell     = useDocumentStore((s) => s.updateTableCell);
   const updateFreeTableElement = useDocumentStore((s) => s.updateFreeTableElement);
   const savedPath  = useDocumentStore((s) => s.path);
   const markSaved  = useDocumentStore((s) => s.markSaved);
   const undo       = useDocumentStore((s) => s.undo);
+  const redo       = useDocumentStore((s) => s.redo);
   const caret = useUiStore((s) => s.caret);
   const setCaret = useUiStore((s) => s.setCaret);
   const insertMode = useUiStore((s) => s.insertMode);
   const setInsertMode = useUiStore((s) => s.setInsertMode);
   const selectedFreeId = useUiStore((s) => s.selectedFreeId);
   const setSelectedFreeId = useUiStore((s) => s.setSelectedFreeId);
+  const selectedFreeIds = useUiStore((s) => s.selectedFreeIds);
+  const setSelectedFreeIds = useUiStore((s) => s.setSelectedFreeIds);
   const { flowWidth, fontFamily, fontSize, bold, italic } = useDisplayStore();
   const [autoEditId, setAutoEditId] = useState<string | null>(null);
   // 分岐列ごとのキャレット（key: branchFlowId）
@@ -982,6 +988,15 @@ function PageCanvas() {
     cursorX: number;
     cursorY: number;
   } | null>(null);
+
+  // 自由要素クリップボード（Ctrl+C / Ctrl+X でセット）
+  const [freeClipboard, setFreeClipboard] = useState<FreeElement[] | null>(null);
+  // ラバーバンド選択中の矩形
+  const [selectionRect, setSelectionRect] = useState<{
+    startX: number; startY: number; curX: number; curY: number;
+  } | null>(null);
+  // マルチドラッグ用ベース座標（ドラッグ開始時にキャプチャ）
+  const multiDragBasesRef = useRef<Map<string, { x?: number; y?: number; points?: { x: number; y: number }[] }>>(new Map());
 
   // ---- 用紙寸法 ----
   const { w: paperW, h: paperH } = getPaperDims(
@@ -1051,10 +1066,17 @@ function PageCanvas() {
         return;
       }
 
-      // Ctrl+Z / Cmd+Z: アンドゥ
-      if (isModifier && e.key === "z") {
+      // Ctrl+Z / Cmd+Z: アンドゥ（Shift 併用時はリドゥ）
+      if (isModifier && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         undo();
+        return;
+      }
+
+      // Ctrl+Y / Ctrl+Shift+Z: リドゥ
+      if (isModifier && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        redo();
         return;
       }
 
@@ -1072,8 +1094,20 @@ function PageCanvas() {
         target.tagName === "INPUT" ||
         target.isContentEditable;
 
-      // Ctrl+C / Cmd+C: 選択ブロックをコピー（編集中はブラウザ標準に任せる）
+      // Ctrl+C / Cmd+C: コピー（編集中はブラウザ標準に任せる）
       if (isModifier && e.key === "c" && !isEditable) {
+        // 自由要素のコピーを優先
+        const copyIds = selectedFreeIds.length > 0 ? selectedFreeIds
+          : selectedFreeId ? [selectedFreeId] : [];
+        if (copyIds.length > 0) {
+          const elems = doc.freeElements.filter((el) => copyIds.includes(el.id));
+          if (elems.length > 0) {
+            e.preventDefault();
+            setFreeClipboard(elems);
+            return;
+          }
+        }
+        // mainFlow ブロックのコピー
         if (caret.kind === "block") {
           const block = doc.mainFlow.blocks.find((b) => b.id === caret.blockId);
           if (block?.type === "operation") {
@@ -1084,8 +1118,23 @@ function PageCanvas() {
         return;
       }
 
-      // Ctrl+X / Cmd+X: 選択ブロックを切り取り（編集中はブラウザ標準に任せる）
+      // Ctrl+X / Cmd+X: 切り取り（編集中はブラウザ標準に任せる）
       if (isModifier && e.key === "x" && !isEditable) {
+        // 自由要素の切り取りを優先
+        const cutIds = selectedFreeIds.length > 0 ? selectedFreeIds
+          : selectedFreeId ? [selectedFreeId] : [];
+        if (cutIds.length > 0) {
+          const elems = doc.freeElements.filter((el) => cutIds.includes(el.id));
+          if (elems.length > 0) {
+            e.preventDefault();
+            setFreeClipboard(elems);
+            cutIds.forEach((id) => removeFreeElement(id));
+            setSelectedFreeId(null);
+            setSelectedFreeIds([]);
+            return;
+          }
+        }
+        // mainFlow ブロックの切り取り
         if (caret.kind === "block") {
           const block = doc.mainFlow.blocks.find((b) => b.id === caret.blockId);
           if (block?.type === "operation") {
@@ -1098,8 +1147,23 @@ function PageCanvas() {
         return;
       }
 
-      // Ctrl+V / Cmd+V: クリップボードの内容を貼り付け（編集中はブラウザ標準に任せる）
+      // Ctrl+V / Cmd+V: 貼り付け（編集中はブラウザ標準に任せる）
       if (isModifier && e.key === "v" && !isEditable) {
+        // 自由要素のペーストを優先
+        if (freeClipboard && freeClipboard.length > 0) {
+          e.preventDefault();
+          const newIds = cloneFreeElements(freeClipboard, 20, 20);
+          if (newIds.length === 1) {
+            setSelectedFreeId(newIds[0]);
+            setSelectedFreeIds([]);
+          } else {
+            setSelectedFreeIds(newIds);
+            setSelectedFreeId(null);
+          }
+          setCaret({ kind: "none" });
+          return;
+        }
+        // mainFlow ブロックのペースト
         if (clipboard) {
           e.preventDefault();
           const blocks = doc.mainFlow.blocks;
@@ -1119,6 +1183,13 @@ function PageCanvas() {
       if (isEditable) return;
 
       if (e.key === "Delete" || e.key === "Backspace") {
+        // 複数自由要素の一括削除
+        if (selectedFreeIds.length > 0) {
+          e.preventDefault();
+          selectedFreeIds.forEach((id) => removeFreeElement(id));
+          setSelectedFreeIds([]);
+          return;
+        }
         if (caret.kind === "block") {
           e.preventDefault();
           deleteBlock(caret.blockId);
@@ -1128,6 +1199,8 @@ function PageCanvas() {
       if (e.key === "Escape") {
         setAutoEditId(null);
         setCaret({ kind: "none" });
+        setSelectedFreeId(null);
+        setSelectedFreeIds([]);
         setDrawingArrow(null);
         setMergeSelectBranchId(null);
         if (insertMode) setInsertMode(null);
@@ -1143,7 +1216,9 @@ function PageCanvas() {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [caret, deleteBlock, setCaret, doc, handleArrowNext, insertMode, setInsertMode,
-     savedPath, markSaved, mergeSelectBranchId, undo, clipboard, insertOperation],
+     savedPath, markSaved, mergeSelectBranchId, undo, redo, clipboard, insertOperation,
+     selectedFreeId, selectedFreeIds, freeClipboard, cloneFreeElements, removeFreeElement,
+     setSelectedFreeId, setSelectedFreeIds],
   );
 
   useEffect(() => {
@@ -1192,6 +1267,7 @@ function PageCanvas() {
   // ページ div の ref（ページ番号 → HTMLDivElement）
   const pageEls = useRef<Map<number, HTMLDivElement>>(new Map());
   const [branchConns, setBranchConns] = useState<BranchConnItem[]>([]);
+  const [selectedBranchFlowId, setSelectedBranchFlowId] = useState<string | null>(null);
 
   // ブロック・ギャップ・ボタン以外の場所をクリックしたら選択解除
   // （各ブロックは e.stopPropagation() しているのでここには届かない）
@@ -1205,48 +1281,132 @@ function PageCanvas() {
     setAutoEditId(null);
     setCaret({ kind: "none" });
     setSelectedFreeId(null);
+    setSelectedFreeIds([]);
+    setSelectedBranchFlowId(null);
   }
 
   // テキストボックス挿入モード: マウスダウンからドラッグしてサイズを決める
+  // insertMode === null のとき: ラバーバンド選択を開始する
   function handlePaperMouseDown(e: React.MouseEvent<HTMLDivElement>, pageIdx: number) {
-    if (insertMode !== "text") return;
-    e.stopPropagation();
-    e.preventDefault();
+    if (insertMode === "text") {
+      e.stopPropagation();
+      e.preventDefault();
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const startX = e.clientX - rect.left;
+      const startY = e.clientY - rect.top;
+
+      setDrawingBox({ pageIdx, startX, startY, curX: startX, curY: startY });
+
+      function onMouseMove(ev: MouseEvent) {
+        setDrawingBox({
+          pageIdx, startX, startY,
+          curX: ev.clientX - rect.left,
+          curY: ev.clientY - rect.top,
+        });
+      }
+
+      function onMouseUp(ev: MouseEvent) {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup",   onMouseUp);
+
+        const endX = ev.clientX - rect.left;
+        const endY = ev.clientY - rect.top;
+        const x = Math.min(startX, endX);
+        const y = Math.min(startY, endY);
+        const w = Math.max(Math.abs(endX - startX), 80);  // 最小幅 80px
+        const h = Math.max(Math.abs(endY - startY), 30);  // 最小高 30px
+
+        setDrawingBox(null);
+        setInsertMode(null);
+
+        const newId = addFreeTextElement(x, y, w, h);
+        setSelectedFreeId(newId);
+      }
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup",   onMouseUp);
+      return;
+    }
+
+    if (insertMode !== null) return;
+
+    // insertMode === null: ラバーバンド選択
+    // 自由要素は onMouseDown で stopPropagation するので、ここに届くのは紙面の空き領域のみ
+
+    // input / contentEditable / button などフォーカス可能な要素がクリックされた場合は
+    // e.preventDefault() を呼ばない（ブラウザのフォーカス動作を阻害しないため）
+    const evTarget = e.target as HTMLElement;
+    const isInteractive =
+      evTarget.tagName === "INPUT" ||
+      evTarget.tagName === "TEXTAREA" ||
+      evTarget.tagName === "BUTTON" ||
+      evTarget.tagName === "SELECT" ||
+      evTarget.isContentEditable;
+    if (!isInteractive) {
+      e.preventDefault(); // ラバーバンド中のブラウザテキスト選択を防ぐ
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
 
-    setDrawingBox({ pageIdx, startX, startY, curX: startX, curY: startY });
+    // selectionRect は mousedown 直後には設定しない（0×0 の青い点が表示されてしまうため）
+    // 5px 以上動いた時点で初めて表示する
 
-    function onMouseMove(ev: MouseEvent) {
-      setDrawingBox({
-        pageIdx, startX, startY,
-        curX: ev.clientX - rect.left,
-        curY: ev.clientY - rect.top,
-      });
+    function onSelMove(ev: MouseEvent) {
+      const curX = ev.clientX - rect.left;
+      const curY = ev.clientY - rect.top;
+      // 閾値を超えたときだけラバーバンドを表示
+      if (Math.abs(curX - startX) > 5 || Math.abs(curY - startY) > 5) {
+        setSelectionRect({ startX, startY, curX, curY });
+      }
     }
 
-    function onMouseUp(ev: MouseEvent) {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup",   onMouseUp);
+    function onSelUp(ev: MouseEvent) {
+      window.removeEventListener("mousemove", onSelMove);
+      window.removeEventListener("mouseup",   onSelUp);
 
       const endX = ev.clientX - rect.left;
       const endY = ev.clientY - rect.top;
-      const x = Math.min(startX, endX);
-      const y = Math.min(startY, endY);
-      const w = Math.max(Math.abs(endX - startX), 80);  // 最小幅 80px
-      const h = Math.max(Math.abs(endY - startY), 30);  // 最小高 30px
+      setSelectionRect(null);
 
-      setDrawingBox(null);
-      setInsertMode(null);
+      const selX = Math.min(startX, endX);
+      const selY = Math.min(startY, endY);
+      const selW = Math.abs(endX - startX);
+      const selH = Math.abs(endY - startY);
 
-      const newId = addFreeTextElement(x, y, w, h);
-      setSelectedFreeId(newId);
+      // 5px 未満は通常クリック扱い → ラバーバンド選択しない
+      if (selW < 5 && selH < 5) return;
+
+      // 選択矩形と各自由要素の矩形が重なるものを収集
+      const hits: string[] = [];
+      for (const freeEl of doc.freeElements) {
+        let elX: number, elY: number, elW: number, elH: number;
+        if (freeEl.type === "arrow") {
+          const xs = freeEl.points.map((p) => p.x);
+          const ys = freeEl.points.map((p) => p.y);
+          elX = Math.min(...xs); elY = Math.min(...ys);
+          elW = Math.max(...xs) - elX; elH = Math.max(...ys) - elY;
+        } else {
+          elX = freeEl.x; elY = freeEl.y; elW = freeEl.w; elH = freeEl.h;
+        }
+        // AABB 交差判定
+        if (selX < elX + elW && selX + selW > elX && selY < elY + elH && selY + selH > elY) {
+          hits.push(freeEl.id);
+        }
+      }
+
+      if (hits.length > 0) {
+        setSelectedFreeIds(hits);
+        setSelectedFreeId(null);
+        setCaret({ kind: "none" });
+        setAutoEditId(null);
+      }
     }
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup",   onMouseUp);
+    window.addEventListener("mousemove", onSelMove);
+    window.addEventListener("mouseup",   onSelUp);
   }
 
   // 矢印描画モード: 左クリックで点追加、右クリックで終了（矢じり確定）
@@ -1295,6 +1455,94 @@ function PageCanvas() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     setDrawingArrow((prev) => prev ? { ...prev, cursorX: x, cursorY: y } : null);
+  }
+
+  // ---- マルチドラッグ: ベース座標のキャプチャ ----
+  function handleFreeElementMoveStart(elId: string) {
+    // 複数選択グループに属していない場合は何もしない
+    const groupIds = selectedFreeIds.length > 1 && selectedFreeIds.includes(elId)
+      ? selectedFreeIds : null;
+    if (!groupIds) {
+      multiDragBasesRef.current = new Map();
+      return;
+    }
+    const bases = new Map<string, { x?: number; y?: number; points?: { x: number; y: number }[] }>();
+    for (const id of groupIds) {
+      const el = doc.freeElements.find((e) => e.id === id);
+      if (!el) continue;
+      if (el.type === "arrow") {
+        bases.set(id, { points: el.points.map((p) => ({ ...p })) });
+      } else {
+        bases.set(id, { x: el.x, y: el.y });
+      }
+    }
+    multiDragBasesRef.current = bases;
+  }
+
+  // ---- マルチドラッグ: onUpdate ラッパー ----
+  // ドラッグ中の要素の onUpdate を横取りして、グループ全体を同じ量だけ動かす。
+  // patch は { x, y } または { points } の形で来る。
+
+  /** dx/dy からグループ全体の移動リストを組み立てる */
+  function buildGroupMoves(
+    groupIds: string[],
+    dx: number,
+    dy: number,
+  ): Array<{ id: string; x?: number; y?: number; points?: { x: number; y: number }[] }> {
+    const bases = multiDragBasesRef.current;
+    const result: Array<{ id: string; x?: number; y?: number; points?: { x: number; y: number }[] }> = [];
+    for (const id of groupIds) {
+      const base = bases.get(id);
+      const freeEl = doc.freeElements.find((e) => e.id === id);
+      if (!base || !freeEl) continue;
+      if (freeEl.type === "arrow" && base.points) {
+        result.push({ id, points: base.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) });
+      } else if (base.x !== undefined && base.y !== undefined) {
+        result.push({ id, x: base.x + dx, y: base.y + dy });
+      }
+    }
+    return result;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function makeFreeGroupUpdate<P extends Record<string, any>>(
+    el: FreeElement,
+    updateFn: (patch: P) => void,
+  ): (patch: P) => void {
+    return (patch) => {
+      const bases = multiDragBasesRef.current;
+      const groupIds = selectedFreeIds.length > 1 && selectedFreeIds.includes(el.id)
+        ? selectedFreeIds : null;
+
+      if (groupIds && bases.size > 0) {
+        // x/y ベースの要素（text / image / table）がドラッグしているとき
+        if ("x" in patch || "y" in patch) {
+          const myBase = bases.get(el.id);
+          if (myBase && myBase.x !== undefined && myBase.y !== undefined) {
+            const dx = ((patch.x as number | undefined) ?? (el as { x: number }).x) - myBase.x;
+            const dy = ((patch.y as number | undefined) ?? (el as { y: number }).y) - myBase.y;
+            const moves = buildGroupMoves(groupIds, dx, dy);
+            if (moves.length > 0) moveFreeElementsBulk(moves);
+            return;
+          }
+        }
+        // points ベースの要素（arrow）がドラッグしているとき
+        if ("points" in patch && Array.isArray(patch.points) && el.type === "arrow") {
+          const myBase = bases.get(el.id);
+          const newPts = patch.points as { x: number; y: number }[];
+          if (myBase && myBase.points && myBase.points.length > 0 && newPts.length > 0) {
+            const dx = newPts[0].x - myBase.points[0].x;
+            const dy = newPts[0].y - myBase.points[0].y;
+            const moves = buildGroupMoves(groupIds, dx, dy);
+            if (moves.length > 0) moveFreeElementsBulk(moves);
+            return;
+          }
+        }
+      }
+
+      // グループ移動なし → 通常の単体更新
+      updateFn(patch);
+    };
   }
 
   // ---- プローブ要素でテキスト幅を実測 ----
@@ -1390,28 +1638,38 @@ function PageCanvas() {
 
       const pr = pageEl.getBoundingClientRect();
 
-      // 入口: source arrow 右端中心 → 分岐ヘッダー左端中心
+      // 入口: source arrow 中心X（縦線と合流）→ 分岐ヘッダー左端中心
       const sr = sourceEl.getBoundingClientRect();
       const er = entryEl.getBoundingClientRect();
+      const srcY = computeGapY(sourceEl, bf.sourceGapAfter, pageEl);
       const entry = {
-        x1: sr.right - pr.left,
-        y1: sr.top + sr.height / 2 - pr.top,
+        x1: (sr.left + sr.right) / 2 - pr.left,  // 縦矢印の中心X
+        y1: srcY,
         x2: er.left  - pr.left,
         y2: er.top + er.height / 2 - pr.top,
       };
 
-      // 出口: 分岐フッター左端中心 → 合流先矢印右端中心
+      // 出口: 分岐フッター左端中心 → 合流先ブロック中心X（縦線と合流）
+      // 後方互換: mergeTargetId がなければ mergeTargetArrowId を使う
+      const mergeId = bf.mergeTargetId ?? bf.mergeTargetArrowId ?? null;
       let exit: BranchConnItem["exit"];
-      if (bf.mergeTargetArrowId && exitEl) {
-        const mergeEl = document.querySelector<HTMLElement>(`[data-arrow-id="${bf.mergeTargetArrowId}"]`);
+      if (mergeId && exitEl) {
+        const mergeEl = document.querySelector<HTMLElement>(`[data-conn-block="${mergeId}"]`);
         if (mergeEl && pageEl.contains(mergeEl)) {
           const xr = exitEl.getBoundingClientRect();
           const mr = mergeEl.getBoundingClientRect();
+          const mrgY = computeGapY(mergeEl, bf.mergeGapAfter, pageEl);
+          // arrow ブロック → 縦線の中心X に少しオフセット
+          // operation ブロック（ボックス）→ 右端の外側
+          const isArrow = !!mergeEl.dataset.arrowId;
+          const mergeX = isArrow
+            ? (mr.left + mr.right) / 2 - pr.left + 10
+            : mr.right - pr.left + 8;
           exit = {
             x1: xr.left  - pr.left,
             y1: xr.top + xr.height / 2 - pr.top,
-            x2: mr.right - pr.left,
-            y2: mr.top + mr.height / 2 - pr.top,
+            x2: mergeX,
+            y2: mrgY,
           };
         }
       }
@@ -1474,6 +1732,7 @@ function PageCanvas() {
     onAddAttachment: addAttachment,
     onUpdateAttachment: updateAttachment,
     onRemoveAttachment: removeAttachment,
+    onReorderAttachments: reorderAttachments,
     onInsertSpacer: (beforeBlockIndex: number) => insertSpacer(beforeBlockIndex),
     onUpdateSpacerHeight: updateSpacerHeight,
     onDeleteSpacer: deleteBlock,
@@ -1571,7 +1830,7 @@ function PageCanvas() {
                       colW={colW}
                       caret={bfCaret}
                       autoEditId={bfAutoEdit}
-                      mergeTargetArrowId={bf.mergeTargetArrowId}
+                      mergeTargetArrowId={bf.mergeTargetId ?? bf.mergeTargetArrowId ?? null}
                       isMergeSelectMode={mergeSelectBranchId === bf.id}
                       onMergeStart={() => {
                         if (mergeSelectBranchId === bf.id) {
@@ -1635,7 +1894,7 @@ function PageCanvas() {
             </div>
           </div>
 
-          {/* ドラッグ中のプレビュー矩形 */}
+          {/* テキストボックス描画プレビュー矩形 */}
           {drawingBox?.pageIdx === pageIdx && (() => {
             const px = Math.min(drawingBox.startX, drawingBox.curX);
             const py = Math.min(drawingBox.startY, drawingBox.curY);
@@ -1655,20 +1914,44 @@ function PageCanvas() {
             );
           })()}
 
-          {/* 自由配置要素（テキスト・画像・表、1ページ目のみ） */}
+          {/* ラバーバンド選択プレビュー矩形 */}
+          {selectionRect && pageIdx === 0 && (() => {
+            const px = Math.min(selectionRect.startX, selectionRect.curX);
+            const py = Math.min(selectionRect.startY, selectionRect.curY);
+            const pw = Math.abs(selectionRect.curX - selectionRect.startX);
+            const ph = Math.abs(selectionRect.curY - selectionRect.startY);
+            return (
+              <div
+                style={{
+                  position: "absolute",
+                  left: px, top: py, width: pw, height: ph,
+                  border: "1.5px solid #3b82f6",
+                  backgroundColor: "rgba(59,130,246,0.08)",
+                  pointerEvents: "none",
+                  zIndex: 151,
+                }}
+              />
+            );
+          })()}
+
+          {/* 自由配置要素（テキスト・画像・表・矢印、1ページ目のみ） */}
           {pageIdx === 0 &&
             doc.freeElements.map((el) => {
+              const isSelected = selectedFreeId === el.id || selectedFreeIds.includes(el.id);
               const commonProps = {
-                selected: selectedFreeId === el.id,
+                selected: isSelected,
                 onSelect: () => {
                   setSelectedFreeId(el.id);
+                  setSelectedFreeIds([]);
                   setCaret({ kind: "none" });
                   setAutoEditId(null);
                 },
                 onDelete: () => {
                   removeFreeElement(el.id);
                   setSelectedFreeId(null);
+                  setSelectedFreeIds(selectedFreeIds.filter((id) => id !== el.id));
                 },
+                onMoveStart: () => handleFreeElementMoveStart(el.id),
               };
               if (el.type === "text") {
                 return (
@@ -1676,7 +1959,7 @@ function PageCanvas() {
                     key={el.id}
                     {...commonProps}
                     el={el}
-                    onUpdate={(patch) => updateFreeElement(el.id, patch)}
+                    onUpdate={makeFreeGroupUpdate(el, (patch) => updateFreeElement(el.id, patch))}
                   />
                 );
               }
@@ -1686,7 +1969,7 @@ function PageCanvas() {
                     key={el.id}
                     {...commonProps}
                     el={el}
-                    onUpdate={(patch) => updateFreeImageElement(el.id, patch)}
+                    onUpdate={makeFreeGroupUpdate(el, (patch) => updateFreeImageElement(el.id, patch))}
                   />
                 );
               }
@@ -1696,7 +1979,7 @@ function PageCanvas() {
                     key={el.id}
                     {...commonProps}
                     el={el}
-                    onUpdate={(patch) => updateFreeTableElement(el.id, patch)}
+                    onUpdate={makeFreeGroupUpdate(el, (patch) => updateFreeTableElement(el.id, patch))}
                     onUpdateCell={(row, col, patch) => updateTableCell(el.id, row, col, patch)}
                   />
                 );
@@ -1707,7 +1990,7 @@ function PageCanvas() {
                     key={el.id}
                     {...commonProps}
                     el={el}
-                    onUpdate={(patch) => updateFreeArrowElement(el.id, patch)}
+                    onUpdate={makeFreeGroupUpdate(el, (patch) => updateFreeArrowElement(el.id, patch))}
                   />
                 );
               }
@@ -1720,6 +2003,15 @@ function PageCanvas() {
               connections={branchConns.filter((c) => c.pageIdx === pageIdx)}
               paperW={paperW}
               paperH={paperH}
+              pageEl={pageEls.current.get(pageIdx) ?? null}
+              selectedBranchFlowId={selectedBranchFlowId}
+              onSelectBranchFlow={(id) => {
+                setSelectedBranchFlowId(id);
+                setCaret({ kind: "none" });
+                setSelectedFreeId(null);
+              }}
+              onDragEntryArrow={(branchFlowId, arrowId, gapAfter) => setBranchSourceArrow(branchFlowId, arrowId, gapAfter)}
+              onDragExitArrow={(branchFlowId, blockId, gapAfter) => setBranchMergeTarget(branchFlowId, blockId, gapAfter)}
             />
           )}
 
@@ -1747,6 +2039,7 @@ function PageCanvas() {
 // ============================================================
 // 分岐接続線 SVG オーバーレイ
 // ページ上に絶対配置し、主フロー矢印 ↔ 分岐列をカーブ線で結ぶ。
+// ドラッグハンドル（●）で接続元・合流先を変更できる。
 // ============================================================
 type ConnPoint = { x1: number; y1: number; x2: number; y2: number };
 type BranchConnItem = {
@@ -1759,15 +2052,240 @@ type BranchConnItem = {
 /** SVG 座標値を小数点 1 桁で丸める */
 function f(n: number) { return Math.round(n * 10) / 10; }
 
+/**
+ * clientX/Y の位置にある特定属性の HTML 要素を探す（SVG はスキップ）。
+ */
+function findElemAtPoint(clientX: number, clientY: number, attr: string): HTMLElement | null {
+  const els = document.elementsFromPoint(clientX, clientY);
+  for (const el of els) {
+    if (el instanceof SVGElement) continue;
+    const html = el as HTMLElement;
+    if (html.dataset && attr.replace("data-", "").replace(/-([a-z])/g, (_, c) => c.toUpperCase()) in html.dataset) return html;
+    const ancestor = html.closest?.(`[${attr}]`) as HTMLElement | null;
+    if (ancestor) return ancestor;
+  }
+  return null;
+}
+
+/** data-arrow-id を持つ要素（ArrowBlock）を clientX/Y から探す */
+function findArrowElemAtPoint(clientX: number, clientY: number): HTMLElement | null {
+  const els = document.elementsFromPoint(clientX, clientY);
+  for (const el of els) {
+    if (el instanceof SVGElement) continue;
+    const html = el as HTMLElement;
+    if (html.dataset?.arrowId) return html;
+    const anc = html.closest?.("[data-arrow-id]") as HTMLElement | null;
+    if (anc?.dataset?.arrowId) return anc;
+  }
+  return null;
+}
+
+/** data-conn-block を持つ要素（ArrowBlock or OperationBlock）を clientX/Y から探す */
+function findConnBlockAtPoint(clientX: number, clientY: number): HTMLElement | null {
+  const els = document.elementsFromPoint(clientX, clientY);
+  for (const el of els) {
+    if (el instanceof SVGElement) continue;
+    const html = el as HTMLElement;
+    if (html.dataset?.connBlock) return html;
+    const anc = html.closest?.("[data-conn-block]") as HTMLElement | null;
+    if (anc?.dataset?.connBlock) return anc;
+  }
+  return null;
+}
+
+/** 最近傍の [data-arrow-id] 要素を探す（フォールバック用） */
+function findNearestArrowElem(clientX: number, clientY: number, maxDist = 60): HTMLElement | null {
+  const candidates = document.querySelectorAll<HTMLElement>("[data-arrow-id]");
+  let best: HTMLElement | null = null;
+  let bestDist = maxDist;
+  candidates.forEach((el) => {
+    const r = el.getBoundingClientRect();
+    const dx = Math.max(r.left - clientX, 0, clientX - r.right);
+    const dy = Math.max(r.top  - clientY, 0, clientY - r.bottom);
+    const dist = Math.hypot(dx, dy);
+    if (dist < bestDist) { bestDist = dist; best = el; }
+  });
+  return best;
+}
+
+/** 最近傍の [data-conn-block] 要素を探す（フォールバック用） */
+function findNearestConnBlock(clientX: number, clientY: number, maxDist = 60): HTMLElement | null {
+  const candidates = document.querySelectorAll<HTMLElement>("[data-conn-block]");
+  let best: HTMLElement | null = null;
+  let bestDist = maxDist;
+  candidates.forEach((el) => {
+    const r = el.getBoundingClientRect();
+    const dx = Math.max(r.left - clientX, 0, clientX - r.right);
+    const dy = Math.max(r.top  - clientY, 0, clientY - r.bottom);
+    const dist = Math.hypot(dx, dy);
+    if (dist < bestDist) { bestDist = dist; best = el; }
+  });
+  return best;
+}
+
+/**
+ * ブロック要素内のアタッチ行ギャップ一覧（Y=clientY ベース）を返す。
+ * ギャップID: null = 全行の上、attachmentId = その行の下端
+ */
+function getAttachGaps(blockEl: HTMLElement): Array<{ gapAfter: string | null; clientY: number }> {
+  const rows = Array.from(blockEl.querySelectorAll<HTMLElement>("[data-attach-row]"));
+  const br = blockEl.getBoundingClientRect();
+  if (rows.length === 0) {
+    return [{ gapAfter: null, clientY: br.top + br.height / 2 }];
+  }
+  const gaps: Array<{ gapAfter: string | null; clientY: number }> = [];
+  // 全行より上
+  gaps.push({ gapAfter: null, clientY: rows[0].getBoundingClientRect().top });
+  // 各行の下端
+  rows.forEach((row) => {
+    const attId = row.dataset.attachRow ?? null;
+    gaps.push({ gapAfter: attId, clientY: row.getBoundingClientRect().bottom });
+  });
+  return gaps;
+}
+
+/** clientY に最も近いギャップを返す */
+function nearestGap(gaps: ReturnType<typeof getAttachGaps>, clientY: number) {
+  let best = gaps[0];
+  let bestDist = Infinity;
+  for (const g of gaps) {
+    const dist = Math.abs(clientY - g.clientY);
+    if (dist < bestDist) { bestDist = dist; best = g; }
+  }
+  return best;
+}
+
+/**
+ * ブロック要素と gapAfter から、ページ座標系の Y を計算する。
+ * null = 全行より上（または中央）、ID = その行の下端、undefined = ブロック下端。
+ */
+function computeGapY(blockEl: HTMLElement, gapAfter: string | null | undefined, pageEl: HTMLElement): number {
+  const pr = pageEl.getBoundingClientRect();
+  const br = blockEl.getBoundingClientRect();
+  const rows = Array.from(blockEl.querySelectorAll<HTMLElement>("[data-attach-row]"));
+  if (rows.length === 0) return br.top + br.height / 2 - pr.top;
+  if (gapAfter === undefined) {
+    // 省略 = 最終行の下端
+    return rows[rows.length - 1].getBoundingClientRect().bottom - pr.top;
+  }
+  if (gapAfter === null) {
+    // 全行より上
+    return rows[0].getBoundingClientRect().top - pr.top;
+  }
+  // 特定行の下端
+  const rowEl = blockEl.querySelector<HTMLElement>(`[data-attach-row="${gapAfter}"]`);
+  if (rowEl) return rowEl.getBoundingClientRect().bottom - pr.top;
+  // 見つからなければ中央
+  return br.top + br.height / 2 - pr.top;
+}
+
 function BranchConnectionSvg({
   connections,
   paperW,
   paperH,
+  pageEl,
+  selectedBranchFlowId,
+  onSelectBranchFlow,
+  onDragEntryArrow,
+  onDragExitArrow,
 }: {
   connections: BranchConnItem[];
   paperW: number;
   paperH: number;
+  /** ページ div（座標変換用） */
+  pageEl: HTMLDivElement | null;
+  /** 選択中の分岐フロー ID（ハンドル表示に使う） */
+  selectedBranchFlowId: string | null;
+  /** 接続線クリック時に選択する */
+  onSelectBranchFlow: (id: string) => void;
+  /** 入口ハンドルをドロップしたときに呼ばれる（分岐元矢印とギャップを変更） */
+  onDragEntryArrow: (branchFlowId: string, arrowId: string, gapAfter: string | null) => void;
+  /** 出口ハンドルをドロップしたときに呼ばれる（合流先ブロック＝arrow/op とギャップを変更） */
+  onDragExitArrow: (branchFlowId: string, blockId: string, gapAfter: string | null) => void;
 }) {
+  // ドラッグ中の仮ハンドル位置（React state = 描画用）
+  const [dragState, setDragState] = useState<{
+    branchFlowId: string;
+    kind: "entry" | "exit";
+    /** SVGページ座標 */
+    x: number;
+    y: number;
+    /** ホバー中のブロック element */
+    hoveredEl: HTMLElement | null;
+    /** ホバー中のスナップギャップ情報 */
+    hoveredGap: { gapAfter: string | null; clientY: number } | null;
+  } | null>(null);
+
+  // ドロップ先を ref に保存（pointerup closure 問題を回避）
+  const hoveredRef = useRef<{ blockId: string; gapAfter: string | null } | null>(null);
+
+  function startHandleDrag(
+    e: React.PointerEvent<SVGCircleElement>,
+    branchFlowId: string,
+    kind: "entry" | "exit",
+    startX: number,
+    startY: number,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    hoveredRef.current = null;
+    setDragState({ branchFlowId, kind, x: startX, y: startY, hoveredEl: null, hoveredGap: null });
+
+    function toPageCoords(clientX: number, clientY: number) {
+      if (!pageEl) return { x: clientX, y: clientY };
+      const pr = pageEl.getBoundingClientRect();
+      return { x: clientX - pr.left, y: clientY - pr.top };
+    }
+
+    function resolveHover(clientX: number, clientY: number) {
+      // entry は arrow ブロック限定、exit は arrow/op どちらでも可
+      const blockEl = kind === "entry"
+        ? (findArrowElemAtPoint(clientX, clientY) ?? findNearestArrowElem(clientX, clientY, 48))
+        : (findConnBlockAtPoint(clientX, clientY) ?? findNearestConnBlock(clientX, clientY, 48));
+      if (!blockEl) return { blockEl: null, gap: null };
+      const gaps = getAttachGaps(blockEl);
+      const gap = nearestGap(gaps, clientY);
+      return { blockEl, gap };
+    }
+
+    function onMove(ev: PointerEvent) {
+      const { x, y } = toPageCoords(ev.clientX, ev.clientY);
+      const { blockEl, gap } = resolveHover(ev.clientX, ev.clientY);
+      const blockId = kind === "entry"
+        ? blockEl?.dataset?.arrowId ?? null
+        : blockEl?.dataset?.connBlock ?? null;
+      hoveredRef.current = blockId && gap ? { blockId, gapAfter: gap.gapAfter } : null;
+      setDragState((prev) =>
+        prev ? { ...prev, x, y, hoveredEl: blockEl, hoveredGap: gap } : null,
+      );
+    }
+
+    function onUp(ev: PointerEvent) {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+
+      const { blockEl, gap } = resolveHover(ev.clientX, ev.clientY);
+      const blockId = kind === "entry"
+        ? blockEl?.dataset?.arrowId ?? null
+        : blockEl?.dataset?.connBlock ?? null;
+      const result = (blockId && gap)
+        ? { blockId, gapAfter: gap.gapAfter }
+        : hoveredRef.current;
+
+      setDragState(null);
+      hoveredRef.current = null;
+
+      if (result) {
+        if (kind === "entry") onDragEntryArrow(branchFlowId, result.blockId, result.gapAfter);
+        else onDragExitArrow(branchFlowId, result.blockId, result.gapAfter);
+      }
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   return (
     <svg
       style={{
@@ -1776,7 +2294,7 @@ function BranchConnectionSvg({
         width: paperW,
         height: paperH,
         overflow: "visible",
-        pointerEvents: "none",
+        pointerEvents: "none", // 子要素で個別に pointerEvents: all/stroke を設定
         zIndex: 5,
       }}
     >
@@ -1789,53 +2307,162 @@ function BranchConnectionSvg({
         <marker id="bconn-arr-exit" markerWidth="7" markerHeight="6" refX="6" refY="3" orient="auto">
           <polygon points="0 0, 7 3, 0 6" fill="#34d399" />
         </marker>
+        {/* ドラッグ中ハイライト用矢印ヘッド（オレンジ） */}
+        <marker id="bconn-arr-drag" markerWidth="7" markerHeight="6" refX="6" refY="3" orient="auto">
+          <polygon points="0 0, 7 3, 0 6" fill="#f97316" />
+        </marker>
       </defs>
 
       {connections.map((conn) => {
         const { entry, exit } = conn;
+        const activeDrag = dragState?.branchFlowId === conn.branchFlowId ? dragState : null;
 
-        // ── 入口パス: source arrow 右端 → 分岐列ヘッダー左端 ──
-        // Y が異なる場合は中間 X でエルボを作る
-        const entryMidX = (entry.x1 + entry.x2) / 2;
+        // ドラッグ中は entry.x1,y1 を仮座標に置き換える
+        const entryX1 = (activeDrag?.kind === "entry") ? activeDrag.x : entry.x1;
+        const entryY1 = (activeDrag?.kind === "entry") ? activeDrag.y : entry.y1;
+
+        // ── 入口パス: source arrow 中心X → 分岐列ヘッダー左端 ──
+        // 縦矢印から横に出て折れる。入口は右寄り (-6px)、出口と重ならないよう分ける
+        const entryBendX = entry.x2 - 6;  // 分岐列手前で折れる（右寄り）
         const entryD =
-          Math.abs(entry.y1 - entry.y2) < 3
-            ? `M ${f(entry.x1)} ${f(entry.y1)} H ${f(entry.x2)}`
-            : `M ${f(entry.x1)} ${f(entry.y1)} H ${f(entryMidX)} V ${f(entry.y2)} H ${f(entry.x2)}`;
+          Math.abs(entryY1 - entry.y2) < 3
+            ? `M ${f(entryX1)} ${f(entryY1)} H ${f(entry.x2)}`
+            : `M ${f(entryX1)} ${f(entryY1)} H ${f(entryBendX)} V ${f(entry.y2)} H ${f(entry.x2)}`;
 
-        // ── 出口パス: 分岐列フッター左端 → 合流先矢印右端 ──
-        // 分岐列は主フロー列の右にあるため、出口は右→左方向
-        // exit.x1 (分岐左端) > exit.x2 (合流先右端) の想定
+        // ── 出口パス: 分岐列フッター左端 → 合流先 arrow 中心X ──
+        // 出口は左寄り (+6px)、入口と重ならないよう分ける
         let exitD: string | null = null;
+        let exitX2 = exit?.x2 ?? 0;
+        let exitY2 = exit?.y2 ?? 0;
         if (exit) {
-          const exitMidX = (exit.x1 + exit.x2) / 2;
+          if (activeDrag?.kind === "exit") {
+            exitX2 = activeDrag.x;
+            exitY2 = activeDrag.y;
+          }
+          const exitBendX = exit.x1 + 6;  // 分岐列直後で折れる（左寄り）
           exitD =
-            Math.abs(exit.y1 - exit.y2) < 3
-              ? `M ${f(exit.x1)} ${f(exit.y1)} H ${f(exit.x2)}`
-              : `M ${f(exit.x1)} ${f(exit.y1)} H ${f(exitMidX)} V ${f(exit.y2)} H ${f(exit.x2)}`;
+            Math.abs(exit.y1 - exitY2) < 3
+              ? `M ${f(exit.x1)} ${f(exit.y1)} H ${f(exitX2)}`
+              : `M ${f(exit.x1)} ${f(exit.y1)} H ${f(exitBendX)} V ${f(exitY2)} H ${f(exitX2)}`;
         }
+
+        // ドラッグ中のハイライト色
+        const entryDragging = activeDrag?.kind === "entry";
+        const exitDragging  = activeDrag?.kind === "exit";
+
+        const isSelected = selectedBranchFlowId === conn.branchFlowId;
 
         return (
           <g key={conn.branchFlowId}>
-            {/* 入口矢印（青点線） */}
+            {/* 入口矢印（青点線）― 見た目 */}
             <path
               d={entryD}
               fill="none"
-              stroke="#93c5fd"
-              strokeWidth={1.5}
+              stroke={entryDragging ? "#f97316" : "#93c5fd"}
+              strokeWidth={entryDragging ? 2 : 1.5}
               strokeDasharray="5 3"
-              markerEnd="url(#bconn-arr-entry)"
+              markerEnd={entryDragging ? "url(#bconn-arr-drag)" : "url(#bconn-arr-entry)"}
+              style={{ pointerEvents: "none" }}
             />
-            {/* 出口矢印（緑点線） */}
+            {/* 入口矢印 ― クリック判定用（透明・太め） */}
+            <path
+              d={entryD}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={10}
+              style={{ pointerEvents: "stroke", cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); onSelectBranchFlow(conn.branchFlowId); }}
+            />
+            {/* 出口矢印（緑点線）― 見た目 */}
             {exitD && (
               <path
                 d={exitD}
                 fill="none"
-                stroke="#6ee7b7"
-                strokeWidth={1.5}
+                stroke={exitDragging ? "#f97316" : "#6ee7b7"}
+                strokeWidth={exitDragging ? 2 : 1.5}
                 strokeDasharray="5 3"
-                markerEnd="url(#bconn-arr-exit)"
+                markerEnd={exitDragging ? "url(#bconn-arr-drag)" : "url(#bconn-arr-exit)"}
+                style={{ pointerEvents: "none" }}
               />
             )}
+            {/* 出口矢印 ― クリック判定用（透明・太め） */}
+            {exitD && (
+              <path
+                d={exitD}
+                fill="none"
+                stroke="transparent"
+                strokeWidth={10}
+                style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                onClick={(e) => { e.stopPropagation(); onSelectBranchFlow(conn.branchFlowId); }}
+              />
+            )}
+
+            {/* ── ドラッグハンドル: 選択中のみ表示 ── */}
+            {isSelected && (
+              <>
+                {/* 入口ハンドル（青●）― source arrow 右端 */}
+                <circle
+                  cx={f(entryX1)}
+                  cy={f(entryY1)}
+                  r={6}
+                  fill={entryDragging ? "#f97316" : "#60a5fa"}
+                  stroke="white"
+                  strokeWidth={1.5}
+                  style={{ pointerEvents: "all", cursor: "grab" }}
+                  onPointerDown={(e) => startHandleDrag(e, conn.branchFlowId, "entry", entry.x1, entry.y1)}
+                />
+                {/* 出口ハンドル（緑●）― 合流先の矢じり位置 */}
+                {exit && (
+                  <circle
+                    cx={f(exitX2)}
+                    cy={f(exitY2)}
+                    r={6}
+                    fill={exitDragging ? "#f97316" : "#34d399"}
+                    stroke="white"
+                    strokeWidth={1.5}
+                    style={{ pointerEvents: "all", cursor: "grab" }}
+                    onPointerDown={(e) => startHandleDrag(e, conn.branchFlowId, "exit", exit.x2, exit.y2)}
+                  />
+                )}
+              </>
+            )}
+
+            {/* ドラッグ中のホバーブロックハイライト＋ギャップインジケーター */}
+            {activeDrag?.hoveredEl && activeDrag.hoveredGap && pageEl && (() => {
+              const blockEl = activeDrag.hoveredEl;
+              const gap = activeDrag.hoveredGap;
+              const pr = pageEl.getBoundingClientRect();
+              const br = blockEl.getBoundingClientRect();
+              const rx = f(br.left - pr.left - 3);
+              const ry = f(br.top - pr.top - 3);
+              const rw = f(br.width + 6);
+              const rh = f(br.height + 6);
+              const gapPageY = f(gap.clientY - pr.top);
+              const isEntry = activeDrag.kind === "entry";
+              const color = isEntry ? "#60a5fa" : "#34d399";
+              return (
+                <g style={{ pointerEvents: "none" }}>
+                  <rect
+                    x={rx} y={ry} width={rw} height={rh}
+                    rx={4}
+                    fill={isEntry ? "rgba(147,197,253,0.10)" : "rgba(110,231,183,0.10)"}
+                    stroke={color}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 2"
+                  />
+                  <line
+                    x1={rx} y1={gapPageY} x2={rx + rw} y2={gapPageY}
+                    stroke="#f97316"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                  />
+                  <polygon
+                    points={`${rx + rw + 3},${gapPageY} ${rx + rw + 8},${gapPageY - 4} ${rx + rw + 13},${gapPageY} ${rx + rw + 8},${gapPageY + 4}`}
+                    fill="#f97316"
+                  />
+                </g>
+              );
+            })()}
           </g>
         );
       })}

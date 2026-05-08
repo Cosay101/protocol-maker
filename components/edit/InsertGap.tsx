@@ -46,6 +46,7 @@ export function InsertGap({ onDirectInsert, onInsertSpacer, onInsertColumnBreak,
   return (
     <div
       ref={ref}
+      data-no-print
       className="group relative flex w-full cursor-pointer items-center justify-center select-none"
       style={{ height: h }}
       title="ここにステップを追加"
