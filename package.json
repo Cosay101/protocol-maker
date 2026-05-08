@@ -10,10 +10,8 @@
     "format": "prettier --write .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build && node scripts/copy-installer.mjs",
-    "tauri:beta": "tauri build --debug && node scripts/copy-installer.mjs",
-    "dist:open": "explorer dist",
-    "release:setup": "tauri signer generate -w .tauri-signing-key && echo 公開鍵を tauri.conf.json の plugins.updater.pubkey に貼り付けてください"
+    "tauri:build": "tauri build",
+    "tauri:beta": "tauri build --debug"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
