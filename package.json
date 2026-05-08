@@ -2,6 +2,7 @@
   "name": "protocol-maker",
   "version": "0.1.0-beta.2",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
